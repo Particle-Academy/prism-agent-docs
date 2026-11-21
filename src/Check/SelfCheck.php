@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Prism\AgentDocs\Check;
 
 use LastWord\Agent;
+use Prism\AgentDocs\Limits\Expressible;
 use Prism\AgentDocs\Pictures\PictureRegistry;
 use Prism\AgentDocs\Source;
 use Prism\AgentDocs\Support\DocumentTree;
@@ -37,6 +38,11 @@ use Throwable;
  *  6. It has no first-page-only band the working copy lacked, unless the
  *     request asked for first-page-only (Moic's 0.1.0 test: the letterhead
  *     art moved into `firstHeader`, so page two had no logo).
+ *  7. A reported limit's expressible part that the request asked for is in
+ *     it (G-316 lab run 01a2002d: "use no margins for the header" reported
+ *     the limit and left the header distance, which a .docx holds, as it
+ *     was). A limit is a reason to offer the rest, not to skip what can be
+ *     done.
  */
 final class SelfCheck
 {
@@ -46,9 +52,10 @@ final class SelfCheck
      * @param  list<string>  $keptBands  bands the draft did not mention, carried from the working copy
      * @param  list<string>  $unchangedPaths  paths of reported limits' alternatives, which must hold the working copy's value
      * @param  list<string>  $noNewBands  first-page bands the file may hold only if the working copy did
+     * @param  list<Expressible>  $expressible  expressible parts of reported limits the request asked for, which the file must hold
      * @return list<Problem>
      */
-    public static function run(Source $source, array $intended, array $images, string $bytes, array $keptBands, bool $allowEmpty, array $unchangedPaths = [], array $noNewBands = []): array
+    public static function run(Source $source, array $intended, array $images, string $bytes, array $keptBands, bool $allowEmpty, array $unchangedPaths = [], array $noNewBands = [], array $expressible = []): array
     {
         try {
             $produced = Agent::read($bytes);
@@ -67,6 +74,7 @@ final class SelfCheck
         array_push($problems, ...self::bands($source, $produced, $keptBands));
         array_push($problems, ...self::offeredOnly($source, $produced, $unchangedPaths));
         array_push($problems, ...self::newFirstPageBands($source, $produced, $noNewBands));
+        array_push($problems, ...self::skipped($produced, $expressible));
 
         if ($problems === [] && $source->exists() && Agent::equivalent($produced, $source->read)) {
             $problems[] = new Problem(Problem::NO_CHANGE, '/', 'This draft is identical to the document you were given, so it changes nothing. If the request cannot be done in this format, call report_limit instead of writing a draft.');
@@ -154,6 +162,25 @@ final class SelfCheck
         foreach ($paths as $path) {
             if (! Paths::same($source->read, $produced, $path)) {
                 $problems[] = new Problem(Problem::ALTERNATIVE_APPLIED, '/'.str_replace('.', '/', $path), sprintf('%s is part of the alternative to a limit you reported. An alternative is offered to the person, never applied: leave %s as it is in the document you were given.', $path, $path));
+            }
+        }
+
+        return $problems;
+    }
+
+    /**
+     * The problem for each expressible part a document does not hold.
+     *
+     * @param  array<mixed>  $document
+     * @param  list<Expressible>  $parts
+     * @return list<Problem>
+     */
+    public static function skipped(array $document, array $parts): array
+    {
+        $problems = [];
+        foreach ($parts as $part) {
+            if (! $part->heldBy($document)) {
+                $problems[] = new Problem(Problem::EXPRESSIBLE_PART_SKIPPED, '/'.str_replace('.', '/', $part->path), sprintf('The request asks for a part of this limit the format CAN do, and the draft does not do it. %s Leave the limit\'s alternative out: it is still only offered.', $part->instruction));
             }
         }
 

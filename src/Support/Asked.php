@@ -18,8 +18,9 @@ namespace Prism\AgentDocs\Support;
  *    whitespace collapsed and on word boundaries. "No margins for the header"
  *    does not ask for zero side margins for the whole page, however close the
  *    meaning: the model's reading of intent is exactly what is not trusted.
- *  - The digit 0 reads as "zero", and typographic apostrophes as plain ones,
- *    so "set the side margins to 0 for the whole page" matches.
+ *  - The digit 0 reads as "zero", also at the end of a sentence ("0."), but
+ *    not inside another number ("0.5", "10"); typographic apostrophes read as
+ *    plain ones. So "set the side margins to 0 for the whole page" matches.
  *  - A match with a negation in the four words before it does not count:
  *    "don't set the side margins to zero for the whole page".
  */
@@ -70,7 +71,9 @@ final class Asked
     private static function normalise(string $text): string
     {
         $text = mb_strtolower(str_replace(["\u{2019}", "\u{2018}"], "'", $text));
-        $text = (string) preg_replace('/(?<![\w.])0(?![\w.])/u', 'zero', $text);
+        // A full stop after the 0 ends the sentence ("set it to 0."); only a
+        // digit after the point makes it another number ("0.5").
+        $text = (string) preg_replace('/(?<![\w.])0(?!\w|\.\d)/u', 'zero', $text);
 
         return trim((string) preg_replace('/\s+/u', ' ', $text));
     }

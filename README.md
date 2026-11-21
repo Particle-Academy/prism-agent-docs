@@ -45,6 +45,7 @@ $result = app(DocsAgent::class)->edit(
 
 $result->outcome;       // Outcome::Ready, Limit, Failed or NoChange
 $result->message;       // what to show the person, e.g. "The draft is ready."
+$result->limitIds();    // the limits it offers alternatives for; with Ready, the request was partly doable
 $result->draft;         // the checked .docx, already written to the store's draft slot
 $result->baseVersion;   // the saved version the draft derives from (see below)
 ```
@@ -87,7 +88,7 @@ three tools; it adds nothing to your other agents.
 ### From another agent
 
 `DocsAgent::tool($user, $store)` is a Prism tool, `edit_document`, that a parent agent can be
-given. It answers with `{"outcome": "...", "message": "..."}` and never with the document model's
+given. It answers with `{"outcome": "...", "message": "...", "limits": [...]}` and never with the document model's
 own text, so nothing in a document reaches the parent as instructions. It takes a store, and
 each call resolves the store's working copy afresh, so a second request continues the first one's
 draft.
@@ -102,6 +103,7 @@ draft.
 | **It checks the file it wrote** | The written `.docx` is re-opened with last-word's reader. It must not be empty (unless the host passes `allowEmpty`), every picture placed must be in the file in the same part with the same bytes, every band the draft left out must be the working copy's band, and it must change something. A draft that fails is returned to the model to fix, and is never saved. |
 | **It knows the format's limits** | When a request needs something a `.docx` written by last-word cannot express, the model reports one of the limits below by id. The person is told the limit and the closest alternative, in the catalogue's words. |
 | **An alternative is offered, never applied** | While a limit is reported, every document path its alternatives would change (see the table below) keeps the working copy's value: a draft that changes one is set back before it is written, and the self-check refuses a file that still differs there. A draft written before the limit was reported is written again. So the same request gives the same draft whether or not the model applied the alternative, and the message offers it: "The closest alternative, not applied unless you ask for it: ...". The one exception is a request that asks for exactly that change, below; then the draft makes it and the message says so. |
+| **It does the doable part** | A request can be partly doable. "Use no margins for the header" cannot give the header its own side margins, but it can put the header at the top edge of the page: the header DISTANCE, `page.margins.header`, is one value a `.docx` holds. While a limit is reported, each of its doable parts (`expressible` in `limits.json`) that the request asks for, in a document with the band it positions, must be in the draft: a draft without it is refused (`expressible_part_skipped`), and a run that ends without it (a limit reported and nothing drafted, say) is returned to the model once before the result is composed. The outcome is then `Ready` with the limit: "The draft is ready." plus the offer. No doable part is ever one of a limit's alternative paths (the catalogue refuses that), so the side margins stay as they are. |
 | **No first-page band nobody asked for** | A draft that adds `page.firstHeader` or `page.firstFooter` when the working copy has none, and the request does not ask for first-page-only, has it written as `page.header` / `page.footer`, which every page shows. An empty one is dropped; one written beside its own `header` / `footer` is refused for the model to fix; the self-check refuses a file that still has one. When the draft does keep a first-page band (the working copy had it, or the request asked), the message adds "The header art appears on the first page only." |
 | **It does not narrate** | `message` is built from the outcome, not taken from the model: "The draft is ready.", plus a sentence only for something that could not be done, an alternative it offers, or a first-page-only band. |
 | **Bounded by the host** | A request over `maxRequestBytes` (16 KiB by default) and a document with more distinct pictures than `maxImages` (32 by default, last-word's own) are refused before any model call, in fixed words. The picture cap is never raised to fit the file. |
@@ -124,6 +126,16 @@ that states it, and the test suite fails if that quote is no longer in the insta
 | `one-page-colour` | One page colour for the whole document. | One colour throughout. | none |
 | `pictures-png-or-jpeg` | Pictures must be PNG or JPEG. | Convert to PNG. | none |
 
+`side-margins-shared` and `no-bleed-past-margin` also list what such a request can still have:
+
+| doable part | asked by, for example | needs a | value |
+|---|---|---|---|
+| `page.margins.header`, the header distance | "no margins for the header", "header margin to zero", "header at the top edge" | header | `0` |
+| `page.margins.footer`, the footer distance | "no margins for the footer", "footer margin to zero", "footer at the bottom edge" | footer | `0` |
+
+The phrases are read the same narrow way as `askedBy` below. A header distance in a document with
+no header changes nothing anyone can see, so it is not asked of the draft there.
+
 A limit with no paths has alternatives that move content (a chart into the body, a note into the
 text) rather than set one value, so there is no single path to keep; for those the rule rests
 on the prompt and on the no-change check.
@@ -136,7 +148,8 @@ The test is deliberately narrow, and every doubt counts as "not asked":
   word boundaries, ignoring case and spacing. For `side-margins-shared` these all name the
   whole page or document: "set the side margins to zero for the whole page" asks; "no margins
   for the header" and "side margins to zero for the header" do not.
-- The digit `0` reads as "zero", so "side margins to 0 for the whole page" asks too.
+- The digit `0` reads as "zero", also at the end of a sentence, so "side margins to 0 for the
+  whole page" asks too; "0.5" is not zero.
 - A phrase with a negation in the four words before it does not count: "don't set the side
   margins to zero for the whole page".
 - A path asked for by any limit's phrases may change even while another reported limit claims

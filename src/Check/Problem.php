@@ -25,6 +25,9 @@ final readonly class Problem
     /** A first-page-only band the working copy did not have and the request did not ask for. */
     public const string FIRST_PAGE_BAND = 'first_page_band';
 
+    /** A reported limit has a part the format CAN do, the request asked for it, and the draft does not do it. */
+    public const string EXPRESSIBLE_PART_SKIPPED = 'expressible_part_skipped';
+
     public function __construct(
         public string $code,
         public string $where,

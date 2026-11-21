@@ -41,6 +41,9 @@ final class DocsAgent
 
     public const string OWNER = 'particle-academy/prism-agent-docs';
 
+    /** How many times a run that skipped a doable part is returned to the model. Each is one more model call. */
+    public const int PUSHBACKS = 1;
+
     /** @var array<string, Workspace> session key => the edit running on it */
     private array $open = [];
 
@@ -141,6 +144,18 @@ final class DocsAgent
                 $session->newConversation();
             }
             $session->send(Prompt::opening($request, $workspace));
+
+            // The run ended, but a reported limit's doable part, which the
+            // request asked for, is not in what it would hand over (G-316 lab
+            // run 01a2002d: limit reported, no draft written). Return it to
+            // the model, a bounded number of times, before composing a result.
+            for ($i = 0; $i < self::PUSHBACKS; $i++) {
+                $skipped = $workspace->skippedParts();
+                if ($skipped === []) {
+                    break;
+                }
+                $session->send(Prompt::pushback($skipped));
+            }
         } finally {
             unset($this->open[$key]);
         }
@@ -173,7 +188,7 @@ final class DocsAgent
             ->using(function (string $request) use ($participant, $store, $options, $scope): string {
                 $result = $this->edit($participant, $store, $request, $options, $scope);
 
-                return json_encode(['outcome' => $result->outcome->value, 'message' => $result->message], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+                return json_encode(['outcome' => $result->outcome->value, 'message' => $result->message, 'limits' => $result->limitIds()], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             });
     }
 

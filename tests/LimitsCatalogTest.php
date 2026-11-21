@@ -19,7 +19,9 @@ it('cites, word for word, a document in the installed last-word for every limit'
     $normalise = fn (string $s): string => (string) preg_replace('/\s+/', ' ', $s);
 
     foreach (LimitCatalog::load()->all() as $limit) {
-        foreach ($limit->sources as $source) {
+        $sources = array_merge($limit->sources, ...array_map(fn ($part): array => $part->sources, $limit->expressible));
+        expect($sources)->not->toBe([]);
+        foreach ($sources as $source) {
             expect($source['package'])->toBe('particle-academy/last-word');
             $path = $root.'/'.$source['file'];
             expect(is_file($path))->toBeTrue("{$limit->id}: {$source['file']} is not in the installed last-word");
@@ -56,6 +58,61 @@ it('names the paths each margin limit\'s alternatives would change, so they are 
         }
     }
 });
+
+it('names, as data, the parts of a margin limit a .docx can still do, none of them an alternative', function (): void {
+    $catalog = LimitCatalog::load();
+
+    foreach (['side-margins-shared', 'no-bleed-past-margin'] as $id) {
+        $limit = $catalog->get($id);
+        expect(array_map(fn ($part): string => $part->path, $limit->expressible))->toBe(['page.margins.header', 'page.margins.footer'], $id);
+        foreach ($limit->expressible as $part) {
+            expect($part->value)->toBe(0)
+                ->and($part->instruction)->toEndWith('.')
+                ->and($part->askedBy)->not->toBe([])
+                ->and($part->sources)->not->toBe([])
+                ->and(array_intersect([$part->path], $limit->alternativePaths))->toBe([]);
+        }
+    }
+});
+
+it('refuses an expressible part that is an alternative path, so doing it could apply an offer', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'limits');
+    $source = ['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q'];
+    file_put_contents($path, json_encode(['limits' => [
+        ['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'alternativePaths' => ['page.margins.left'], 'applied' => 'Done.'],
+        ['id' => 'z', 'statement' => 'Z.', 'appliesWhen' => 'z', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [
+            ['path' => 'page.margins.left', 'value' => 0, 'instruction' => 'Do it.', 'askedBy' => ['no left margin'], 'bands' => ['header'], 'sources' => [$source]],
+        ]],
+    ]]));
+
+    try {
+        expect(fn () => LimitCatalog::load($path))->toThrow(RuntimeException::class, 'never applied');
+    } finally {
+        unlink($path);
+    }
+});
+
+it('refuses an expressible part without a source or a known band', function (array $part): void {
+    $path = tempnam(sys_get_temp_dir(), 'limits');
+    $source = ['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q'];
+    file_put_contents($path, json_encode(['limits' => [
+        ['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [array_replace(
+            ['path' => 'page.margins.header', 'value' => 0, 'instruction' => 'Do it.', 'askedBy' => ['no header margin'], 'bands' => ['header'], 'sources' => [$source]],
+            $part,
+        )]],
+    ]]));
+
+    try {
+        expect(fn () => LimitCatalog::load($path))->toThrow(RuntimeException::class, 'expressible');
+    } finally {
+        unlink($path);
+    }
+})->with([
+    'no source' => [['sources' => []]],
+    'unknown band' => [['bands' => ['sidebar']]],
+    'no phrases' => [['askedBy' => []]],
+    'not a number' => [['value' => 'zero']],
+]);
 
 it('refuses an alternative path that is not under page', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'limits');

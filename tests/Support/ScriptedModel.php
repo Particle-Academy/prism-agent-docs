@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Prism\Prism\Concerns\CallsTools;
+use Prism\Prism\Contracts\Message;
 use Prism\Prism\Enums\FinishReason;
 use Prism\Prism\PrismManager;
 use Prism\Prism\Testing\PrismFake;
@@ -83,7 +84,12 @@ final class ScriptedModel extends PrismFake
         $steps = [];
         $toolCalls = [];
         $toolResults = [];
-        $messages = [];
+        // As a real provider handler answers: the whole conversation, the
+        // request's messages first. prism-harness records a turn as the
+        // response's messages less the history it sent, so a fake that left
+        // the request out would drop the person's message from the thread,
+        // and a second send would reach the model without it.
+        $messages = array_values($request->messages());
 
         for ($i = 0; $i < max(1, $request->maxSteps()); $i++) {
             $turn = array_shift($this->script) ?? '';
@@ -162,7 +168,7 @@ final class ScriptedModel extends PrismFake
      * @param  list<Step>  $steps
      * @param  list<ToolCall>  $toolCalls
      * @param  list<ToolResult>  $toolResults
-     * @param  list<AssistantMessage|ToolResultMessage>  $messages
+     * @param  list<Message>  $messages
      */
     private function response(array $steps, string $text, FinishReason $reason, array $toolCalls, array $toolResults, array $messages): TextResponse
     {

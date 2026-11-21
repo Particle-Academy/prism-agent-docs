@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Prism\AgentDocs\Limits;
 
 use InvalidArgumentException;
+use Prism\AgentDocs\Support\DocumentTree;
 use RuntimeException;
 
 /**
@@ -43,6 +44,17 @@ final readonly class LimitCatalog
             $limits[$limit->id] = $limit;
         }
 
+        // Doing the doable part must never apply an offered alternative: no
+        // path any limit offers may be one a limit asks the draft to set.
+        $offered = array_merge([], ...array_values(array_map(static fn (Limit $limit): array => $limit->alternativePaths, $limits)));
+        foreach ($limits as $limit) {
+            foreach ($limit->expressible as $part) {
+                if (in_array($part->path, $offered, true)) {
+                    throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" lists "%s" as expressible, but a limit offers it as an alternative, which is never applied.', $limit->id, $part->path));
+                }
+            }
+        }
+
         return new self($limits);
     }
 
@@ -78,6 +90,9 @@ final readonly class LimitCatalog
             foreach ($limit->alternatives as $i => $alternative) {
                 $lines[] = sprintf('  Alternative %d%s: %s', $i, $i === 0 ? ' (closest)' : '', $alternative);
             }
+            foreach ($limit->expressible as $part) {
+                $lines[] = sprintf('  Can still be done, when the request asks for it (for example "%s"): set `%s` to %s. %s', $part->askedBy[0], $part->path, (string) json_encode($part->value), $part->instruction);
+            }
         }
 
         return implode("\n", $lines);
@@ -108,13 +123,7 @@ final readonly class LimitCatalog
             throw new RuntimeException(sprintf('[prism-agent-docs] The limits catalog entry "%s" is malformed: it needs an id, a statement, appliesWhen, at least one alternative and at least one source.', is_string($id) ? $id : '?'));
         }
 
-        $cited = [];
-        foreach ($sources as $source) {
-            if (! is_array($source) || ! is_string($source['package'] ?? null) || ! is_string($source['file'] ?? null) || ! is_string($source['section'] ?? null) || ! is_string($source['quote'] ?? null)) {
-                throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has a source without package, file, section and quote.', $id));
-            }
-            $cited[] = ['package' => $source['package'], 'file' => $source['file'], 'section' => $source['section'], 'quote' => $source['quote']];
-        }
+        $cited = self::sources($sources, $id);
 
         $council = $entry['council'] ?? null;
 
@@ -130,6 +139,12 @@ final readonly class LimitCatalog
             throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has alternativePaths but no "applied" wording for when the request asks for that change.', $id));
         }
 
+        $parts = $entry['expressible'] ?? [];
+        if (! is_array($parts) || ! array_is_list($parts)) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an "expressible" that is not a list.', $id));
+        }
+        $expressible = array_map(static fn (mixed $part): Expressible => self::expressible($part, $id), $parts);
+
         return new Limit(
             $id,
             $statement,
@@ -140,6 +155,45 @@ final readonly class LimitCatalog
             $paths,
             $askedBy,
             is_string($applied) ? $applied : null,
+            $expressible,
         );
+    }
+
+    /**
+     * @param  array<mixed>  $sources
+     * @return list<array{package: string, file: string, section: string, quote: string}>
+     */
+    private static function sources(array $sources, string $id): array
+    {
+        $cited = [];
+        foreach ($sources as $source) {
+            if (! is_array($source) || ! is_string($source['package'] ?? null) || ! is_string($source['file'] ?? null) || ! is_string($source['section'] ?? null) || ! is_string($source['quote'] ?? null)) {
+                throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has a source without package, file, section and quote.', $id));
+            }
+            $cited[] = ['package' => $source['package'], 'file' => $source['file'], 'section' => $source['section'], 'quote' => $source['quote']];
+        }
+
+        return $cited;
+    }
+
+    private static function expressible(mixed $part, string $id): Expressible
+    {
+        if (! is_array($part)) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an expressible part that is not an object.', $id));
+        }
+        $path = $part['path'] ?? null;
+        $value = $part['value'] ?? null;
+        $instruction = $part['instruction'] ?? null;
+        $sources = $part['sources'] ?? null;
+        if (! is_string($path) || preg_match('/^page(\.[A-Za-z]+)+$/', $path) !== 1 || ! (is_int($value) || is_float($value)) || ! is_string($instruction) || $instruction === '' || ! is_array($sources) || $sources === []) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has a malformed expressible part: it needs a dotted path under page, a number value, an instruction and at least one source.', $id));
+        }
+        $askedBy = self::strings($part['askedBy'] ?? null, $id, 'expressible.askedBy');
+        $bands = self::strings($part['bands'] ?? null, $id, 'expressible.bands');
+        if ($askedBy === [] || $bands === [] || array_diff($bands, DocumentTree::BANDS) !== []) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an expressible part for "%s" without askedBy phrases, or without bands from: %s.', $id, $path, implode(', ', DocumentTree::BANDS)));
+        }
+
+        return new Expressible($path, $value, $instruction, $askedBy, $bands, self::sources($sources, $id));
     }
 }
