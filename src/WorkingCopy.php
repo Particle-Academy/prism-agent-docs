@@ -6,6 +6,8 @@ namespace Prism\AgentDocs;
 
 use InvalidArgumentException;
 use LastWord\Agent;
+use Prism\AgentDocs\Revisions\LastWordTrackedChanges;
+use Prism\AgentDocs\Revisions\TrackedChangesGuard;
 use Prism\AgentDocs\Support\DocumentTree;
 
 /**
@@ -50,15 +52,21 @@ final readonly class WorkingCopy
      * The base version is always the SAVED file's, by versionOf(), because a
      * draft derives from the saved file it was made from.
      *
+     * A draft with tracked changes, or one that cannot be checked for them, is
+     * never passed over: it IS the working copy, so the edit refuses it. Its
+     * emptiness is not judged by a read that accepts the changes (a draft of
+     * tracked deletions only reads as empty, and would otherwise be silently
+     * replaced by the saved file).
+     *
      * @throws \Throwable when the pending draft cannot be read; it is not silently passed over
      */
-    public static function fromStore(DocumentStore $store): self
+    public static function fromStore(DocumentStore $store, ?TrackedChangesGuard $trackedChanges = null): self
     {
         $saved = $store->saved();
         $version = self::versionOf($saved);
 
         $draft = $store->draft();
-        if ($draft !== null && $draft !== '' && self::holdsSomething($draft)) {
+        if ($draft !== null && $draft !== '' && (($trackedChanges ?? new LastWordTrackedChanges)->inspect($draft)->refuses() || self::holdsSomething($draft))) {
             return new self($draft, $version);
         }
 

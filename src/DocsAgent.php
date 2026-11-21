@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use LastWord\Exceptions\ImageRefused;
 use LogicException;
 use Prism\AgentDocs\Limits\LimitCatalog;
+use Prism\AgentDocs\Revisions\Inspection;
+use Prism\AgentDocs\Revisions\LastWordTrackedChanges;
+use Prism\AgentDocs\Revisions\TrackedChangesGuard;
 use Prism\AgentDocs\Tools\DocsTools;
 use Prism\Harness\Modes\ModeRegistry;
 use Prism\Harness\Participants\ParticipantRef;
@@ -51,6 +54,8 @@ final class DocsAgent
 
     private readonly LimitCatalog $catalog;
 
+    private readonly TrackedChangesGuard $trackedChanges;
+
     public function __construct(
         private readonly PrismHarness $harness,
         private readonly ToolRegistry $tools,
@@ -58,8 +63,10 @@ final class DocsAgent
         ?LimitCatalog $catalog = null,
         private readonly string $agent = self::AGENT,
         private readonly int $maxSteps = 8,
+        ?TrackedChangesGuard $trackedChanges = null,
     ) {
         $this->catalog = $catalog ?? LimitCatalog::load();
+        $this->trackedChanges = $trackedChanges ?? new LastWordTrackedChanges;
     }
 
     /** Register the mode and the tools in this agent's namespace. Safe to call more than once. */
@@ -111,7 +118,19 @@ final class DocsAgent
         }
 
         try {
-            $copy = $document instanceof WorkingCopy ? $document : WorkingCopy::fromStore($document);
+            $copy = $document instanceof WorkingCopy ? $document : WorkingCopy::fromStore($document, $this->trackedChanges);
+
+            // Before anything reads it: last-word's reader silently accepts
+            // tracked changes, so a draft built from that read would lose
+            // every deletion a reviewer proposed and make every insertion
+            // final. Refused in fixed words, with no model call.
+            if ($copy->bytes !== null) {
+                $inspection = $this->trackedChanges->inspect($copy->bytes);
+                if ($inspection->refuses()) {
+                    return DocsResult::refused($inspection->status === Inspection::TRACKED ? Refusal::TrackedChanges : Refusal::Uncheckable, $version);
+                }
+            }
+
             $source = Source::fromWorkingCopy($copy);
         } catch (Throwable $e) {
             // The reader's words stay with the host: an exception's text is
@@ -188,7 +207,7 @@ final class DocsAgent
             ->using(function (string $request) use ($participant, $store, $options, $scope): string {
                 $result = $this->edit($participant, $store, $request, $options, $scope);
 
-                return json_encode(['outcome' => $result->outcome->value, 'message' => $result->message, 'limits' => $result->limitIds()], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+                return json_encode(['outcome' => $result->outcome->value, 'message' => $result->message, 'limits' => $result->limitIds(), 'refusal' => $result->refusal?->value], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             });
     }
 

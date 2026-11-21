@@ -1,10 +1,11 @@
 {
-    "about": "What a .docx written by particle-academy/last-word cannot express. Each entry quotes the last-word document that states it; tests/LimitsCatalogTest.php fails when a quote is no longer in the installed last-word, so a limit last-word lifts, or rewords, cannot linger here unnoticed. The statement and alternatives are what the person is told, so they are plain words.",
+    "about": "What a .docx written by particle-academy/last-word cannot express, and why. Each entry has a kind: \"format\" when no .docx can hold it, \"writer\" when Word can save it and last-word does not write it yet (Fancy's corrected parity matrix, .ai/plans/docx-parity-matrix.md in the prism envelope, 2026-11-21). A writer limit's statement never says Word or the format cannot do it: it says this writer does not do it yet, and the message offers the closest option. Each entry quotes the last-word source that states it; tests/LimitsCatalogTest.php fails when a quote is no longer in the installed last-word, so a limit last-word lifts, or rewords, cannot linger here unnoticed. The statement and alternatives are what the person is told, so they are plain words.",
     "verifiedAgainst": "particle-academy/last-word 0.21.0",
     "limits": [
         {
             "id": "side-margins-shared",
-            "statement": "A Word page has one pair of side margins, shared by the header, the body and the footer, so the header cannot have different side margins from the body.",
+            "kind": "writer",
+            "statement": "This writer does not yet let the header or footer reach past the side margins while the body keeps them.",
             "appliesWhen": "The request asks for the header or footer to use different left or right margins from the body: no margins for the header only, header art edge to edge while the body keeps its margins, a wider footer.",
             "alternatives": [
                 "Set the side margins to zero for the whole page, so the header art runs edge to edge and the body text does too.",
@@ -124,12 +125,20 @@
                     "file": "src/Schema/Schema.php",
                     "section": "$defs.pageMargins",
                     "quote": "Page margins in points, 72 (one inch) each side by default, and the header and footer DISTANCES: how far the header sits from the top edge of the page and the footer from the bottom edge"
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Writer/DocxWriter.php",
+                    "section": "image drawing (inline only)",
+                    "quote": "<wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">"
                 }
-            ]
+            ],
+            "council": "Fancy CC-fancy-0055 (anchored and floating pictures), first in Fancy's gap order, closes this. Word can: an anchored picture placed relative to the page, or a negative indent. last-word writes every picture inline, inside the margins."
         },
         {
             "id": "no-bleed-past-margin",
-            "statement": "A picture or other block always sits inside the page margins; it cannot run past them to the edge of the page.",
+            "kind": "writer",
+            "statement": "This writer does not yet let a picture or other block run past the page margins to the edge of the page.",
             "appliesWhen": "The request asks for a picture, band or block to bleed off the page, run to the page edge, or sit partly in the margin, while the margins stay.",
             "alternatives": [
                 "Set the page margins to zero, so the picture can reach the edge of the page.",
@@ -146,7 +155,7 @@
                 "no page margins"
             ],
             "applied": "As you asked, the page margins are zero, so the body text reaches the edge of the page as well as the picture.",
-            "council": "Fancy CC-fancy-0055 (pending): whether last-word should offer a bleed. Until it lands, the documented behaviour below is the limit.",
+            "council": "Fancy CC-fancy-0055 (anchored and floating pictures, bleed included), first in Fancy's gap order, closes this. Until it lands, the writer caps every picture at the text column.",
             "expressible": [
                 {
                     "path": "page.margins.header",
@@ -247,11 +256,19 @@
                     "file": "src/Schema/Schema.php",
                     "section": "chart.widthPx",
                     "quote": "Width in px at 96 dpi; capped at the text column."
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Writer/DocxWriter.php",
+                    "section": "computeExtents",
+                    "quote": "Width capped at 6.5in."
                 }
             ]
         },
         {
             "id": "band-no-chart-or-page-break",
+            "kind": "format",
+            "council": "A format limit, as Fancy's corrected matrix keeps it: a page break has no meaning in a header or footer. A chart in one would be a writer gap only if Word accepts one, which is still unverified (an open check for Fancy); re-label it then.",
             "statement": "A header or footer cannot hold a chart or a page break.",
             "appliesWhen": "The request asks for a chart, or a page break, inside the header or footer.",
             "alternatives": [
@@ -264,11 +281,19 @@
                     "file": "README.md",
                     "section": "Headers and footers: a band, or blocks",
                     "quote": "A blocks header takes every block type except `chart` and `pageBreak`, at any depth"
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Schema/Schema.php",
+                    "section": "BAND_REFUSED_TYPES",
+                    "quote": "public const BAND_REFUSED_TYPES = ['chart', 'pageBreak', 'portable'];"
                 }
             ]
         },
         {
             "id": "band-no-footnote",
+            "kind": "format",
+            "council": "A format limit, as Fancy's corrected matrix keeps it: Word does not offer a footnote in a header, and a footnote inside a footnote has no reference mechanism. Unverified in Word itself (an open check for Fancy).",
             "statement": "A header or footer cannot hold a footnote, and a footnote cannot hold another footnote.",
             "appliesWhen": "The request asks for a footnote in the header or footer, or a footnote on a footnote.",
             "alternatives": [
@@ -281,12 +306,19 @@
                     "file": "README.md",
                     "section": "Footnotes",
                     "quote": "but not inside another footnote and not in a header or footer"
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Schema/Validator.php",
+                    "section": "validateFootnote",
+                    "quote": "a header or footer cannot hold a footnote"
                 }
             ]
         },
         {
             "id": "one-page-colour",
-            "statement": "A Word document has one page colour for every page; one part of it cannot have a different background.",
+            "kind": "writer",
+            "statement": "This writer does not yet give some pages a different background from the rest.",
             "appliesWhen": "The request asks for a different page background on some pages or after a page break.",
             "alternatives": [
                 "Use one page colour for the whole document.",
@@ -298,12 +330,20 @@
                     "file": "README.md",
                     "section": "Mixed pages",
                     "quote": "`page.background` on a break is refused: Word has one page colour per document."
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Schema/Schema.php",
+                    "section": "pageBreak.page",
+                    "quote": "'properties' => array_diff_key($pageProps, ['background' => true]),"
                 }
-            ]
+            ],
+            "council": "Fancy gap order item 11 (watermarks and per-section backgrounds, built on CC-fancy-0055). One page colour per document is the format's (w:background); a different background on some pages is a full-page shape behind the text, which Word can save and last-word does not write yet."
         },
         {
             "id": "pictures-png-or-jpeg",
-            "statement": "Pictures must be PNG or JPEG; other formats such as SVG, GIF or EMF cannot be placed.",
+            "kind": "writer",
+            "statement": "This writer does not yet place pictures other than PNG or JPEG, such as SVG, GIF or EMF.",
             "appliesWhen": "The request asks to place a picture that is not PNG or JPEG.",
             "alternatives": [
                 "Convert the picture to PNG and place that."
@@ -314,8 +354,15 @@
                     "file": "README.md",
                     "section": "Headers and footers: a band, or blocks (Hardening)",
                     "quote": "A header or footer image, whether an agent wrote it or `read()` took it from an upload, must be PNG or JPEG by its leading bytes as well as its type"
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Schema/Schema.php",
+                    "section": "image.src",
+                    "quote": "'description' => 'PNG or JPEG data URL.',"
                 }
-            ]
+            ],
+            "council": "Fancy gap order item 17 (image formats). A .docx carries GIF, BMP, TIFF, EMF and WMF, and SVG with a PNG fallback; PNG and JPEG only is last-word's hardening choice, and the owner decides which formats are worth the parser surface."
         }
     ]
 }

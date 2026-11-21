@@ -118,7 +118,7 @@ it('gives the model every catalogued limit, with its alternatives', function ():
 
     $shown = shownToModel($model);
     foreach (docsAgent()->catalog()->all() as $limit) {
-        expect($shown)->toContain('`'.$limit->id.'`: '.$limit->statement)
+        expect($shown)->toContain('`'.$limit->id.'` (')->toContain($limit->statement)
             ->toContain($limit->alternatives[0]);
     }
 });

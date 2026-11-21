@@ -85,7 +85,7 @@ final readonly class LimitCatalog
     {
         $lines = [];
         foreach ($this->limits as $limit) {
-            $lines[] = sprintf('- `%s`: %s', $limit->id, $limit->statement);
+            $lines[] = sprintf('- `%s` (%s): %s', $limit->id, $limit->isWriterGap() ? 'a writer gap: Word can do this, last-word does not write it yet' : 'a format limit: no .docx can hold this', $limit->statement);
             $lines[] = sprintf('  Applies when: %s', $limit->appliesWhen);
             foreach ($limit->alternatives as $i => $alternative) {
                 $lines[] = sprintf('  Alternative %d%s: %s', $i, $i === 0 ? ' (closest)' : '', $alternative);
@@ -125,6 +125,14 @@ final readonly class LimitCatalog
 
         $cited = self::sources($sources, $id);
 
+        $kind = $entry['kind'] ?? null;
+        if (! is_string($kind) || ! in_array($kind, Limit::KINDS, true)) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" needs a kind: "format" when no .docx can hold it, "writer" when Word can and last-word does not write it yet.', $id));
+        }
+        if ($kind === Limit::WRITER && ! self::saysNotYet($statement)) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" is a writer gap, so its statement must say this writer does not do it yet ("This writer does not yet ..."), and never that Word or the format cannot.', $id));
+        }
+
         $council = $entry['council'] ?? null;
 
         $paths = self::strings($entry['alternativePaths'] ?? [], $id, 'alternativePaths');
@@ -156,7 +164,19 @@ final readonly class LimitCatalog
             $askedBy,
             is_string($applied) ? $applied : null,
             $expressible,
+            $kind,
         );
+    }
+
+    /**
+     * A writer gap's statement: about this writer, and not final. It starts
+     * "This writer does not yet", and names neither Word nor the format, nor
+     * calls anything impossible, since Word can do it.
+     */
+    private static function saysNotYet(string $statement): bool
+    {
+        return str_starts_with($statement, 'This writer does not yet ')
+            && preg_match('/\bWord\b|\.docx|\bformat\b|impossible|\bcannot\b|\bcan\'t\b|\bnever\b/i', $statement) !== 1;
     }
 
     /**
