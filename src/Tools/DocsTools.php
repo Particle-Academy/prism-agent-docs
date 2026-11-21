@@ -16,8 +16,8 @@ use Prism\Prism\Tool;
  * The model's tools. Each is a thin wrapper: the rules live in Workspace, so
  * the tools add nothing a test of the workspace would miss.
  *
- * There is no tool that reads the pending draft and none that writes the
- * saved file. What the model can still invoke is: write a checked draft,
+ * There is no tool that reads another version of the document and none
+ * that writes the saved file. What the model can still invoke is: write a checked draft,
  * report a catalogued limit, read the schema.
  */
 final class DocsTools
@@ -34,7 +34,7 @@ final class DocsTools
     {
         return (new Tool)
             ->as(self::WRITE_DRAFT)
-            ->for('Write the document as it should be, as last-word JSON. Keys you leave out are kept from the saved document (body, title, each page band, each margin). The written file is re-opened and checked; problems come back for you to fix.')
+            ->for('Write the document as it should be, as last-word JSON. Keys you leave out are kept from the document you were given (body, title, each page band, each margin). The written file is re-opened and checked; problems come back for you to fix.')
             ->withParameter(new RawSchema('document', [
                 'type' => 'object',
                 'description' => 'A last-word document: {"blocks": [...], "page": {...}, "title": "..."}. Omit what you are not changing. Pictures by name: {"type": "image", "src": "image:NAME"}.',

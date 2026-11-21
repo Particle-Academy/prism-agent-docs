@@ -116,6 +116,45 @@ final class Letterheads
     }
 
     /**
+     * A pending draft the person is looking at: scenario 1's letterhead after
+     * an earlier run wrote a letter into it and changed the footer. Every
+     * difference from the saved file is one a test can see.
+     */
+    public static function continuedDraft(): string
+    {
+        return Agent::toBytes([
+            'blocks' => [
+                ['type' => 'paragraph', 'runs' => [['text' => 'Dear Ms Example,']]],
+                ['type' => 'paragraph', 'runs' => [['text' => 'The draft the person is reading.']]],
+            ],
+            'page' => [
+                'header' => ['blocks' => [
+                    ['type' => 'image', 'src' => self::dataUrl(self::logo()), 'widthPx' => 96, 'heightPx' => 48],
+                    ['type' => 'image', 'src' => self::dataUrl(self::divider())],
+                ]],
+                'footer' => ['center' => 'Confidential'],
+            ],
+        ]);
+    }
+
+    /** A draft whose only content is a footer line: no body, no picture. */
+    public static function footerOnlyDraft(): string
+    {
+        return Agent::toBytes(['blocks' => [], 'page' => ['footer' => ['center' => 'Draft footer']]]);
+    }
+
+    /** A document holding $count distinct pictures in the body. */
+    public static function withPictures(int $count): string
+    {
+        $blocks = [];
+        for ($i = 0; $i < $count; $i++) {
+            $blocks[] = ['type' => 'image', 'src' => self::dataUrl(self::png(4, 4, [10 + $i, 60, 90]))];
+        }
+
+        return Agent::toBytes(['blocks' => $blocks]);
+    }
+
+    /**
      * Every picture in a file, by part, as sha256 of the bytes.
      *
      * @return array<string, list<string>>
