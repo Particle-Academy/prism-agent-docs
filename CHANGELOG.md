@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.5]
+
+A data-loss guard, and the limits catalogue re-labelled to Fancy's corrected document parity matrix (G-316).
+
+No breaking changes.
+
+Nothing in the public API is removed or renamed, and no limit id changes. A document with tracked changes, which 0.1.4 edited, is now refused; four limits are told in new words; the `edit_document` answer gains a `refusal` key.
+
+### Fixed
+
+- **Tracked changes are refused, never read.** last-word 0.21's reader silently accepts tracked changes: inserted text is kept, deleted text is dropped, and nothing says so, so a draft built from that read threw away every deletion a reviewer proposed. Before the working copy is read it is now checked for WordprocessingML revision elements (`w:ins`, `w:del`, `w:moveFrom`, `w:moveTo` and the move range marks, `w:rPrChange`, `w:pPrChange`, `w:sectPrChange`, `w:numberingChange`, the table, row and cell changes, `w:cellIns`, `w:cellDel`, `w:cellMerge`, the custom-XML range marks), in every XML part (document, headers, footers, footnotes, comments, styles), matched by namespace rather than prefix; and for an OpenDocument change region. One found refuses the edit in fixed words, with no model call: "This document has tracked changes. Accept or reject them first, then ask again." The check is bounded (archive size, entry count, each part's inflated size read with an explicit length, the total, the compression ratio), never expands an entity, refuses a part with a DOCTYPE, and refuses a file it cannot check: "The document could not be checked for tracked changes, so nothing was changed."
+- **A pending draft with tracked changes is never passed over.** A draft of tracked deletions only reads as empty, so the store default would have revised the saved file instead. It is now the working copy, and is refused.
+- **A writer gap is no longer told as impossible.** `side-margins-shared`, `no-bleed-past-margin`, `one-page-colour` and `pictures-png-or-jpeg` said Word or the format could not do something Word can save and last-word does not write yet. Each now says "This writer does not yet ...", and the message still offers the closest option.
+
+### Added
+
+- `Refusal` (`tracked_changes`, `uncheckable`), `DocsResult::$refusal`, `DocsResult::refused()`, `DocsResult::TRACKED_CHANGES` and `DocsResult::UNCHECKABLE`; `edit_document` answers with `refusal` too.
+- `Revisions\TrackedChangesGuard`, bound in the container, with `Revisions\ScanForTrackedChanges` (the bounded archive scan) and `Revisions\LastWordTrackedChanges`, the default: last-word 0.22.0's own signal (`Agent::read($bytes, ['refuseTrackedChanges' => true])` and its `trackedChanges` key), detected at runtime with no constraint bump, and the scan always, since last-word's signal covers .docx and .dotx only. `DocsAgent` takes a guard as its last constructor argument; `WorkingCopy::fromStore()` takes one as its second.
+- `kind` on every limit in `resources/limits.json`, required: `format` (no .docx can hold it) or `writer` (Word can; last-word does not write it yet), with `Limit::FORMAT`, `Limit::WRITER`, `Limit::$kind` and `Limit::isWriterGap()`. The catalogue refuses a writer gap whose statement does not start "This writer does not yet", or names Word or the format, or says "cannot" or "impossible". The model is told each limit's kind.
+- Citations from last-word's source for each re-labelled limit, and a `council` note naming Fancy's gap item (CC-fancy-0055, items 11 and 17) or, for the two format limits, what is still unverified in Word.
+- `ext-zip` and `ext-xmlreader` in `require` (last-word already needs `ext-zip`).
+- Mutants M43 to M53 in `tools/mutation-check.php`.
+
 ## [0.1.4]
 
 A fix from the G-316 live lab run 01a20049 (scenario S3), which found a regression in 0.1.3.

@@ -4,9 +4,25 @@ declare(strict_types=1);
 
 namespace Prism\AgentDocs\Limits;
 
-/** One thing a last-word .docx cannot express, with what to offer instead and where last-word says so. */
+/**
+ * One thing a last-word .docx cannot express, with what to offer instead and where last-word says so.
+ *
+ * `kind` says whose limit it is: FORMAT when no .docx can hold it, WRITER when
+ * Word can save it and last-word does not write it yet. A writer limit's
+ * statement never says Word or the format cannot do it (the catalogue refuses
+ * one that does): telling a person something is impossible when it is a gap
+ * in this writer is the defect Fancy's parity matrix found.
+ */
 final readonly class Limit
 {
+    /** No .docx can hold it. */
+    public const string FORMAT = 'format';
+
+    /** Word can save it; last-word does not write it yet. */
+    public const string WRITER = 'writer';
+
+    public const array KINDS = [self::FORMAT, self::WRITER];
+
     /**
      * @param  list<string>  $alternatives  closest first
      * @param  list<array{package: string, file: string, section: string, quote: string}>  $sources
@@ -14,6 +30,7 @@ final readonly class Limit
      * @param  list<string>  $askedBy  the phrases that make a request ask for that change itself, so it is applied (see Support\Asked)
      * @param  ?string  $applied  what the person is told when the request asked for the change and the draft makes it
      * @param  list<Expressible>  $expressible  the parts of such a request a .docx CAN do: drafted even while this limit is reported, when the request asks for them
+     * @param  string  $kind  self::FORMAT or self::WRITER
      */
     public function __construct(
         public string $id,
@@ -26,5 +43,11 @@ final readonly class Limit
         public array $askedBy = [],
         public ?string $applied = null,
         public array $expressible = [],
+        public string $kind = self::FORMAT,
     ) {}
+
+    public function isWriterGap(): bool
+    {
+        return $this->kind === self::WRITER;
+    }
 }

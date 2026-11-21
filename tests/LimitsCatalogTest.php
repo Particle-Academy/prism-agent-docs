@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Composer\InstalledVersions;
+use Prism\AgentDocs\Limits\Limit;
 use Prism\AgentDocs\Limits\LimitCatalog;
 
 /*
@@ -80,8 +81,8 @@ it('refuses an expressible part that is an alternative path, so doing it could a
     $path = tempnam(sys_get_temp_dir(), 'limits');
     $source = ['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q'];
     file_put_contents($path, json_encode(['limits' => [
-        ['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'alternativePaths' => ['page.margins.left'], 'applied' => 'Done.'],
-        ['id' => 'z', 'statement' => 'Z.', 'appliesWhen' => 'z', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [
+        ['id' => 'x', 'kind' => 'format', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'alternativePaths' => ['page.margins.left'], 'applied' => 'Done.'],
+        ['id' => 'z', 'kind' => 'format', 'statement' => 'Z.', 'appliesWhen' => 'z', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [
             ['path' => 'page.margins.left', 'value' => 0, 'done' => 'Done.', 'instruction' => 'Do it.', 'askedBy' => ['no left margin'], 'bands' => ['header'], 'sources' => [$source]],
         ]],
     ]]));
@@ -97,7 +98,7 @@ it('refuses an expressible part without a source or a known band', function (arr
     $path = tempnam(sys_get_temp_dir(), 'limits');
     $source = ['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q'];
     file_put_contents($path, json_encode(['limits' => [
-        ['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [array_replace(
+        ['id' => 'x', 'kind' => 'format', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [array_replace(
             ['path' => 'page.margins.header', 'value' => 0, 'done' => 'Done.', 'instruction' => 'Do it.', 'askedBy' => ['no header margin'], 'bands' => ['header'], 'sources' => [$source]],
             $part,
         )]],
@@ -119,7 +120,7 @@ it('refuses an expressible part without a source or a known band', function (arr
 
 it('refuses an alternative path that is not under page', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'limits');
-    file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q']], 'alternativePaths' => ['blocks'], 'applied' => 'Done.']]]));
+    file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'kind' => 'format', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q']], 'alternativePaths' => ['blocks'], 'applied' => 'Done.']]]));
 
     try {
         expect(fn () => LimitCatalog::load($path))->toThrow(RuntimeException::class, 'dotted path under page');
@@ -130,7 +131,7 @@ it('refuses an alternative path that is not under page', function (): void {
 
 it('refuses a catalogue entry without a source', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'limits');
-    file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => []]]]));
+    file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'kind' => 'format', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => []]]]));
 
     try {
         expect(fn () => LimitCatalog::load($path))->toThrow(RuntimeException::class, 'at least one source');
@@ -139,10 +140,77 @@ it('refuses a catalogue entry without a source', function (): void {
     }
 });
 
-it('lists every catalogued limit in the README', function (): void {
+it('lists every catalogued limit in the README, with its kind', function (): void {
     $readme = (string) file_get_contents(dirname(__DIR__).'/README.md');
 
-    foreach (LimitCatalog::load()->ids() as $id) {
-        expect($readme)->toContain('| `'.$id.'` |');
+    foreach (LimitCatalog::load()->all() as $id => $limit) {
+        expect($readme)->toContain('| `'.$id.'` | '.$limit->kind.' |');
     }
+});
+
+/*
+| Fancy's corrected parity matrix (2026-11-21) says which limits are the
+| format's and which are this writer's. Written out here, not read from the
+| catalogue, so re-labelling one is a deliberate change to this test too.
+*/
+it('labels each limit as Fancy\'s corrected parity matrix does', function (): void {
+    $kinds = array_map(fn ($limit): string => $limit->kind, LimitCatalog::load()->all());
+
+    expect($kinds)->toBe([
+        'side-margins-shared' => Limit::WRITER,
+        'no-bleed-past-margin' => Limit::WRITER,
+        'band-no-chart-or-page-break' => Limit::FORMAT,
+        'band-no-footnote' => Limit::FORMAT,
+        'one-page-colour' => Limit::WRITER,
+        'pictures-png-or-jpeg' => Limit::WRITER,
+    ]);
+});
+
+it('never tells the person Word cannot do what is only this writer\'s gap', function (): void {
+    foreach (LimitCatalog::load()->all() as $limit) {
+        if (! $limit->isWriterGap()) {
+            continue;
+        }
+        expect($limit->statement)->toStartWith('This writer does not yet ', $limit->id)
+            ->and(preg_match('/\bWord\b|\.docx|\bformat\b|impossible|\bcannot\b|\bnever\b/i', $limit->statement))->toBe(0, $limit->id)
+            ->and($limit->council)->toBeString($limit->id);
+    }
+});
+
+it('refuses a writer gap whose statement says Word cannot do it, and a limit without a kind', function (array $entry, string $message): void {
+    $path = tempnam(sys_get_temp_dir(), 'limits');
+    file_put_contents($path, json_encode(['limits' => [array_replace(
+        ['id' => 'x', 'kind' => 'writer', 'statement' => 'This writer does not yet do X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q']]],
+        $entry,
+    )]]));
+
+    try {
+        expect(fn () => LimitCatalog::load($path))->toThrow(RuntimeException::class, $message);
+    } finally {
+        unlink($path);
+    }
+})->with([
+    'the old side-margins wording' => [['statement' => 'A Word page has one pair of side margins, so the header cannot have different side margins from the body.'], 'writer gap'],
+    'not yet, but blaming Word' => [['statement' => 'This writer does not yet do what Word cannot.'], 'writer gap'],
+    'a writer gap with no "not yet"' => [['statement' => 'Pictures must be PNG or JPEG.'], 'writer gap'],
+    'no kind' => [['kind' => null], 'needs a kind'],
+    'an unknown kind' => [['kind' => 'impossible'], 'needs a kind'],
+]);
+
+it('accepts a writer gap that says not yet', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'limits');
+    file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'kind' => 'writer', 'statement' => 'This writer does not yet do X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q']]]]]));
+
+    try {
+        expect(LimitCatalog::load($path)->get('x')->isWriterGap())->toBeTrue();
+    } finally {
+        unlink($path);
+    }
+});
+
+it('tells the model whose limit each one is', function (): void {
+    $prompt = LimitCatalog::load()->forPrompt();
+
+    expect($prompt)->toContain('- `side-margins-shared` (a writer gap: Word can do this, last-word does not write it yet): This writer does not yet')
+        ->toContain('- `band-no-footnote` (a format limit: no .docx can hold this): ');
 });

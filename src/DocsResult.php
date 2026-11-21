@@ -33,9 +33,16 @@ final readonly class DocsResult
 
     public const string REQUEST_TOO_LONG = 'The request is too long for this editor. Shorten it and try again.';
 
+    /** Fixed wording, with Refusal::TrackedChanges: the document is never read, so no tracked change is silently accepted. */
+    public const string TRACKED_CHANGES = 'This document has tracked changes. Accept or reject them first, then ask again.';
+
+    /** Fixed wording, with Refusal::Uncheckable. */
+    public const string UNCHECKABLE = 'The document could not be checked for tracked changes, so nothing was changed.';
+
     /**
      * @param  list<array{limit: Limit, alternative: int}>  $limits
      * @param  list<Problem>  $problems
+     * @param  ?Refusal  $refusal  why the edit was refused before any model call, when it was
      */
     public function __construct(
         public Outcome $outcome,
@@ -44,6 +51,7 @@ final readonly class DocsResult
         public ?string $draft = null,
         public array $limits = [],
         public array $problems = [],
+        public ?Refusal $refusal = null,
     ) {}
 
     /**
@@ -103,6 +111,15 @@ final readonly class DocsResult
     public static function failed(string $message, string $baseVersion, array $problems = []): self
     {
         return new self(Outcome::Failed, $message, $baseVersion, null, [], $problems);
+    }
+
+    /** Refused before any model call, in the refusal's fixed words. */
+    public static function refused(Refusal $refusal, string $baseVersion): self
+    {
+        return new self(Outcome::Failed, match ($refusal) {
+            Refusal::TrackedChanges => self::TRACKED_CHANGES,
+            Refusal::Uncheckable => self::UNCHECKABLE,
+        }, $baseVersion, refusal: $refusal);
     }
 
     public function ready(): bool
