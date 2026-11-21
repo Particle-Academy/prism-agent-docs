@@ -55,8 +55,8 @@ $mutants = [
         'seam' => 'an explicit host working copy is used verbatim',
         'mutation' => 'revise something other than the bytes the host gave',
         'edits' => [['src/DocsAgent.php',
-            '$copy = $document instanceof WorkingCopy ? $document : WorkingCopy::fromStore($document);',
-            '$copy = $document instanceof WorkingCopy ? new WorkingCopy(null, $document->baseVersion) : WorkingCopy::fromStore($document);']],
+            '$copy = $document instanceof WorkingCopy ? $document : WorkingCopy::fromStore($document, $this->trackedChanges);',
+            '$copy = $document instanceof WorkingCopy ? new WorkingCopy(null, $document->baseVersion) : WorkingCopy::fromStore($document, $this->trackedChanges);']],
         'tests' => ['tests/WorkingCopyTest.php'],
     ],
     'M2d' => [
