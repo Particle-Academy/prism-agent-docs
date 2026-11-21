@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Prism\AgentDocs\Limits;
 
+use Prism\AgentDocs\Support\Paths;
+
 /**
  * One thing a last-word .docx cannot express, with what to offer instead and where last-word says so.
  *
@@ -31,6 +33,7 @@ final readonly class Limit
      * @param  ?string  $applied  what the person is told when the request asked for the change and the draft makes it
      * @param  list<Expressible>  $expressible  the parts of such a request a .docx CAN do: drafted even while this limit is reported, when the request asks for them
      * @param  string  $kind  self::FORMAT or self::WRITER
+     * @param  list<?array<string, int|float>>  $alternativeChanges  per alternative, in the same order: the values it would set (`{"page.margins.left": 0}`), `{}` for one that changes nothing ("keep it as it is now"), or null for one that moves content and has no single value to compare
      */
     public function __construct(
         public string $id,
@@ -44,7 +47,55 @@ final readonly class Limit
         public ?string $applied = null,
         public array $expressible = [],
         public string $kind = self::FORMAT,
+        public array $alternativeChanges = [],
     ) {}
+
+    /**
+     * Whether an alternative is what the document already is, so offering it
+     * offers nothing (G-316 live run 01a2007d, S4 and R2: "keep the header art
+     * inside the margins, as it is now" offered on a letterhead whose art
+     * already was). One that changes nothing always is; one that sets values
+     * is when the document already holds every one of them (numbers by value,
+     * absent never); one that moves content never is.
+     *
+     * @param  array<mixed>  $document
+     */
+    public function isCurrentState(int $alternative, array $document): bool
+    {
+        $changes = $this->alternativeChanges[$alternative] ?? null;
+        if ($changes === null) {
+            return false;
+        }
+        foreach ($changes as $path => $value) {
+            [$has, $held] = Paths::get($document, $path);
+            if (! $has || ! (is_int($held) || is_float($held)) || (float) $held !== (float) $value) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * The alternative to offer for this document: the one asked for unless it
+     * is the current state, else the closest that is not, else none. Decided
+     * here, in code, whatever number the model chose.
+     *
+     * @param  array<mixed>  $document
+     */
+    public function offer(int $chosen, array $document): ?int
+    {
+        if (isset($this->alternatives[$chosen]) && ! $this->isCurrentState($chosen, $document)) {
+            return $chosen;
+        }
+        foreach (array_keys($this->alternatives) as $i) {
+            if (! $this->isCurrentState($i, $document)) {
+                return $i;
+            }
+        }
+
+        return null;
+    }
 
     public function isWriterGap(): bool
     {

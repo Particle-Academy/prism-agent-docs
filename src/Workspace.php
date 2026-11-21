@@ -51,7 +51,7 @@ final class Workspace
     /** @var array{0: array<string, mixed>, 1: list<string>}|null what the model sent for the passing draft, to re-run when a limit is reported after it */
     private ?array $accepted = null;
 
-    /** @var list<array{limit: Limit, alternative: int}> */
+    /** @var list<array{limit: Limit, alternative: ?int}> */
     private array $limits = [];
 
     /** @var list<Problem> */
@@ -430,6 +430,9 @@ final class Workspace
         if ($alternative < 0 || $alternative >= count($limit->alternatives)) {
             $alternative = 0;
         }
+        // Never offer what the document already is: the closest alternative
+        // that would change something, or none (G-316 live run 01a2007d).
+        $alternative = $limit->offer($alternative, $this->source->named);
         foreach ($this->limits as $reported) {
             if ($reported['limit']->id === $id) {
                 return ['ok' => true, 'note' => 'Already recorded.'];
@@ -474,7 +477,7 @@ final class Workspace
         return $this->draft;
     }
 
-    /** @return list<array{limit: Limit, alternative: int}> */
+    /** @return list<array{limit: Limit, alternative: ?int}> */
     public function limits(): array
     {
         return $this->limits;

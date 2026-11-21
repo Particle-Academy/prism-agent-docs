@@ -40,7 +40,7 @@ final readonly class DocsResult
     public const string UNCHECKABLE = 'The document could not be checked for tracked changes, so nothing was changed.';
 
     /**
-     * @param  list<array{limit: Limit, alternative: int}>  $limits
+     * @param  list<array{limit: Limit, alternative: ?int}>  $limits
      * @param  list<Problem>  $problems
      * @param  ?Refusal  $refusal  why the edit was refused before any model call, when it was
      */
@@ -73,10 +73,14 @@ final readonly class DocsResult
         // alternative reads as an offer unless the draft really makes it,
         // which only happens when the request asked for exactly that.
         $limits = $workspace->limits();
+        // With no alternative left to offer (every one is what the document
+        // already is), the limit is said alone.
         $notes = array_map(
-            static fn (array $reported): string => $workspace->alternativeApplied($reported['limit'])
-                ? $reported['limit']->statement.' '.$reported['limit']->applied
-                : $reported['limit']->statement.self::OFFER.lcfirst($reported['limit']->alternatives[$reported['alternative']]),
+            static fn (array $reported): string => match (true) {
+                $workspace->alternativeApplied($reported['limit']) => $reported['limit']->statement.' '.$reported['limit']->applied,
+                $reported['alternative'] === null => $reported['limit']->statement,
+                default => $reported['limit']->statement.self::OFFER.lcfirst($reported['limit']->alternatives[$reported['alternative']]),
+            },
             $limits,
         );
 

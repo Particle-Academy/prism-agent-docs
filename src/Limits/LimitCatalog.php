@@ -147,6 +147,8 @@ final readonly class LimitCatalog
             throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has alternativePaths but no "applied" wording for when the request asks for that change.', $id));
         }
 
+        $changes = self::alternativeChanges($entry['alternativeChanges'] ?? null, $id, count(array_filter($alternatives, is_string(...))), $paths);
+
         $parts = $entry['expressible'] ?? [];
         if (! is_array($parts) || ! array_is_list($parts)) {
             throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an "expressible" that is not a list.', $id));
@@ -165,7 +167,47 @@ final readonly class LimitCatalog
             is_string($applied) ? $applied : null,
             $expressible,
             $kind,
+            $changes,
         );
+    }
+
+    /**
+     * One entry per alternative: null (moves content), {} (changes nothing),
+     * or dotted `page` paths to numbers, each one of the limit's
+     * alternativePaths, so what an alternative would set is also what
+     * offer-not-apply keeps.
+     *
+     * @param  list<string>  $paths
+     * @return list<?array<string, int|float>>
+     */
+    private static function alternativeChanges(mixed $value, string $id, int $count, array $paths): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value) || ! array_is_list($value) || count($value) !== $count) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has alternativeChanges that is not a list with one entry per alternative.', $id));
+        }
+        $out = [];
+        foreach ($value as $changes) {
+            if ($changes === null) {
+                $out[] = null;
+
+                continue;
+            }
+            if (! is_array($changes) || ($changes !== [] && array_is_list($changes))) {
+                throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an alternativeChanges entry that is neither null nor an object of paths to numbers.', $id));
+            }
+            foreach ($changes as $path => $number) {
+                if (! is_string($path) || ! in_array($path, $paths, true) || ! (is_int($number) || is_float($number))) {
+                    throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an alternativeChanges entry setting "%s": each path must be one of its alternativePaths, set to a number.', $id, (string) $path));
+                }
+            }
+            /** @var array<string, int|float> $changes */
+            $out[] = $changes;
+        }
+
+        return $out;
     }
 
     /**

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.6]
+
+A fix from the G-316 live lab run 01a2007d (scenarios S4 and R2, which passed every structural check and failed the judge).
+
+No breaking changes.
+
+Nothing in the public API is removed or renamed. `Workspace::limits()` and `DocsResult::$limits` may now hold `null` for `alternative`, when no alternative is left to offer.
+
+### Fixed
+
+- **Never offer what the document already is.** The model chose "keep the header art inside the page margins, as it is now" on a letterhead whose art already was, and the person was offered their own layout. The offered alternative is now decided in code: the model's choice unless the working copy already holds every value it would set, else the closest alternative that would change something, else none, and then the message is the limit alone. On S4 and R2 the offer is now "set the side margins to zero for the whole page".
+
+### Added
+
+- `alternativeChanges` in `resources/limits.json`: per alternative, the values it would set, `{}` for one that changes nothing, or `null` for one that moves content. The catalogue refuses one that does not line up with the alternatives or names a path outside the limit's `alternativePaths`. `side-margins-shared` and `no-bleed-past-margin` declare theirs.
+- `Limit::$alternativeChanges`, `Limit::isCurrentState()` and `Limit::offer()`.
+- Mutants M54 to M56 in `tools/mutation-check.php`; M20 re-pointed.
+
 ## [0.1.5]
 
 A data-loss guard, and the limits catalogue re-labelled to Fancy's corrected document parity matrix (G-316).

@@ -202,7 +202,7 @@ $mutants = [
     'M20' => [
         'seam' => 'the message offers an alternative the draft does not contain (owner rule)',
         'mutation' => 'word every alternative as applied',
-        'edits' => [['src/DocsResult.php', 'static fn (array $reported): string => $workspace->alternativeApplied($reported[\'limit\'])', 'static fn (array $reported): string => true']],
+        'edits' => [['src/DocsResult.php', '$workspace->alternativeApplied($reported[\'limit\']) => ', 'true => ']],
         'tests' => ['tests/OfferNotApplyTest.php'],
     ],
     'M21' => [
@@ -414,6 +414,25 @@ $mutants = [
         'mutation' => 'accept any kind, or none',
         'edits' => [['src/Limits/LimitCatalog.php', 'if (! is_string($kind) || ! in_array($kind, Limit::KINDS, true)) {', 'if (false) {']],
         'tests' => ['tests/LimitsCatalogTest.php'],
+    ],
+    // G-316 live run 01a2007d (S4, R2): never offer what the document already is.
+    'M54' => [
+        'seam' => 'the offered alternative is decided in code, never the model\'s current-state pick',
+        'mutation' => 'offer whatever number the model chose',
+        'edits' => [['src/Workspace.php', '$alternative = $limit->offer($alternative, $this->source->named);', '']],
+        'tests' => ['tests/NoCurrentStateOfferTest.php'],
+    ],
+    'M55' => [
+        'seam' => 'a current-state pick falls back to the closest substantive alternative',
+        'mutation' => 'offer none instead',
+        'edits' => [['src/Limits/Limit.php', 'foreach (array_keys($this->alternatives) as $i) {', 'foreach ([] as $i) {']],
+        'tests' => ['tests/NoCurrentStateOfferTest.php'],
+    ],
+    'M56' => [
+        'seam' => 'an alternative is the current state only when the document holds its values',
+        'mutation' => 'count any value as held',
+        'edits' => [['src/Limits/Limit.php', '|| (float) $held !== (float) $value) {', ') {']],
+        'tests' => ['tests/NoCurrentStateOfferTest.php'],
     ],
 ];
 
