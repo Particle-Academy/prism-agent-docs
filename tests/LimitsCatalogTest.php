@@ -45,6 +45,29 @@ it('gives every limit a plain statement and at least one alternative', function 
     }
 });
 
+it('names the paths each margin limit\'s alternatives would change, so they are offered and never applied', function (): void {
+    $catalog = LimitCatalog::load();
+
+    expect($catalog->get('side-margins-shared')->alternativePaths)->toBe(['page.margins.left', 'page.margins.right'])
+        ->and($catalog->get('no-bleed-past-margin')->alternativePaths)->toBe(['page.margins.top', 'page.margins.right', 'page.margins.bottom', 'page.margins.left']);
+    foreach ($catalog->all() as $limit) {
+        if ($limit->alternativePaths !== []) {
+            expect($limit->applied)->toBeString()->toEndWith('.');
+        }
+    }
+});
+
+it('refuses an alternative path that is not under page', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'limits');
+    file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q']], 'alternativePaths' => ['blocks'], 'applied' => 'Done.']]]));
+
+    try {
+        expect(fn () => LimitCatalog::load($path))->toThrow(RuntimeException::class, 'dotted path under page');
+    } finally {
+        unlink($path);
+    }
+});
+
 it('refuses a catalogue entry without a source', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'limits');
     file_put_contents($path, json_encode(['limits' => [['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => []]]]));

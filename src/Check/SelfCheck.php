@@ -8,6 +8,7 @@ use LastWord\Agent;
 use Prism\AgentDocs\Pictures\PictureRegistry;
 use Prism\AgentDocs\Source;
 use Prism\AgentDocs\Support\DocumentTree;
+use Prism\AgentDocs\Support\Paths;
 use Throwable;
 
 /**
@@ -27,6 +28,15 @@ use Throwable;
  *     chose to revise, so a continued draft's header is the one kept.
  *  4. It changes something. A draft identical to the working copy presented
  *     as the change is scenario 3's failure.
+ *  5. A reported limit's alternative is not in it. Every path that
+ *     alternative would change (`page.margins.left`) holds the working copy's
+ *     value, unless the request asked for that change (Moic's 0.1.0 test:
+ *     the message offered zero side margins and the draft already had them).
+ *     The workspace reverts such a change before writing; this is the check
+ *     that the file agrees.
+ *  6. It has no first-page-only band the working copy lacked, unless the
+ *     request asked for first-page-only (Moic's 0.1.0 test: the letterhead
+ *     art moved into `firstHeader`, so page two had no logo).
  */
 final class SelfCheck
 {
@@ -34,9 +44,11 @@ final class SelfCheck
      * @param  array<string, mixed>  $intended  the composed draft, pictures as `image:NAME` or data URLs
      * @param  array<string, string>  $images  every registered picture, name => bytes
      * @param  list<string>  $keptBands  bands the draft did not mention, carried from the working copy
+     * @param  list<string>  $unchangedPaths  paths of reported limits' alternatives, which must hold the working copy's value
+     * @param  list<string>  $noNewBands  first-page bands the file may hold only if the working copy did
      * @return list<Problem>
      */
-    public static function run(Source $source, array $intended, array $images, string $bytes, array $keptBands, bool $allowEmpty): array
+    public static function run(Source $source, array $intended, array $images, string $bytes, array $keptBands, bool $allowEmpty, array $unchangedPaths = [], array $noNewBands = []): array
     {
         try {
             $produced = Agent::read($bytes);
@@ -53,6 +65,8 @@ final class SelfCheck
 
         array_push($problems, ...self::pictures($intended, $images, $produced));
         array_push($problems, ...self::bands($source, $produced, $keptBands));
+        array_push($problems, ...self::offeredOnly($source, $produced, $unchangedPaths));
+        array_push($problems, ...self::newFirstPageBands($source, $produced, $noNewBands));
 
         if ($problems === [] && $source->exists() && Agent::equivalent($produced, $source->read)) {
             $problems[] = new Problem(Problem::NO_CHANGE, '/', 'This draft is identical to the document you were given, so it changes nothing. If the request cannot be done in this format, call report_limit instead of writing a draft.');
@@ -123,6 +137,43 @@ final class SelfCheck
             }
             if (! Agent::equivalent(['blocks' => [], 'page' => [$band => $base[$band]]], ['blocks' => [], 'page' => [$band => $now[$band]]])) {
                 $problems[] = new Problem(Problem::BAND_CHANGED, '/page/'.$band, sprintf('The request did not change the %s, but the written file has a different one. Leave page.%s out of the draft to keep it.', $band, $band));
+            }
+        }
+
+        return $problems;
+    }
+
+    /**
+     * @param  array<string, mixed>  $produced
+     * @param  list<string>  $paths
+     * @return list<Problem>
+     */
+    private static function offeredOnly(Source $source, array $produced, array $paths): array
+    {
+        $problems = [];
+        foreach ($paths as $path) {
+            if (! Paths::same($source->read, $produced, $path)) {
+                $problems[] = new Problem(Problem::ALTERNATIVE_APPLIED, '/'.str_replace('.', '/', $path), sprintf('%s is part of the alternative to a limit you reported. An alternative is offered to the person, never applied: leave %s as it is in the document you were given.', $path, $path));
+            }
+        }
+
+        return $problems;
+    }
+
+    /**
+     * @param  array<string, mixed>  $produced
+     * @param  list<string>  $bands
+     * @return list<Problem>
+     */
+    private static function newFirstPageBands(Source $source, array $produced, array $bands): array
+    {
+        $base = is_array($source->read['page'] ?? null) ? $source->read['page'] : [];
+        $now = is_array($produced['page'] ?? null) ? $produced['page'] : [];
+
+        $problems = [];
+        foreach ($bands as $band) {
+            if (isset($now[$band]) && ! isset($base[$band])) {
+                $problems[] = new Problem(Problem::FIRST_PAGE_BAND, '/page/'.$band, sprintf('page.%s shows on the first page only, and the request did not ask for that. Use the band every page shows (page.%s) instead.', $band, lcfirst(substr($band, 5))));
             }
         }
 

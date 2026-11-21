@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.2]
+
+Two fixes from a live test of 0.1.0 against a real letterhead.
+
+No breaking changes. Nothing in the public API is removed or renamed; the one visible difference is the wording of an offered alternative in `message`.
+
+### Fixed
+
+- **An alternative is offered, never applied.** The same request ("use this file as a letterhead template with no margins for the header") reported `side-margins-shared` every time, but some drafts already had zero side margins while the message offered them. Now, while a limit is reported, every path its alternatives would change (`alternativePaths` in `limits.json`) is set back to the working copy's value before the draft is written, and a draft that passed before the limit was reported is written again. The draft is the same whether or not the model applied the alternative. The exception is a request that asks for exactly that change, by one of the limit's `askedBy` phrases; then the draft makes it and the message says it was done.
+- **The message matches the draft.** An offered alternative now reads "The closest alternative, not applied unless you ask for it: ..." instead of "The closest alternative: ...". An applied one reads as done, in the catalogue's `applied` words.
+- **No first-page header nobody asked for.** A draft that added `page.firstHeader` / `page.firstFooter` when the working copy had none put the letterhead art on page one only. Unless the request asks for first-page-only, such a band is now written as `page.header` / `page.footer`; an empty one is dropped, and one written beside its own `header` / `footer` is refused for the model to fix. When the draft keeps a first-page band, the message adds one line saying so.
+
+### Added
+
+- Two self-check rules: the file holds the working copy's value at every reported limit's alternative paths, and it has no first-page band the working copy lacked unless asked. Problem codes `alternative_applied` and `first_page_band`.
+- `Limit::$alternativePaths`, `Limit::$askedBy` and `Limit::$applied`, read from `limits.json`; `side-margins-shared` and `no-bleed-past-margin` carry them.
+- `write_draft` results carry `changed`, naming what was set back or moved, so the model is told.
+- `DocsResult::OFFER` and `DocsResult::FIRST_PAGE_ONLY`, the wording above.
+- Mutants M14 to M26 in `tools/mutation-check.php`, one per new rule.
+- The system prompt says an alternative is offered, not applied, and that `header` / `footer` are for what every page shows. The code above is what enforces both.
+
 ## [0.1.0]
 
 The first release. Nothing to break: no earlier version exists.

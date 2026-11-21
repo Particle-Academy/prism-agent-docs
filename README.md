@@ -101,7 +101,9 @@ draft.
 | **What a draft leaves out is kept** | A draft that omits `page.header` (or the footer, the body, the title, a margin) keeps the working copy's. A band is dropped only when the draft lists it in `remove`. |
 | **It checks the file it wrote** | The written `.docx` is re-opened with last-word's reader. It must not be empty (unless the host passes `allowEmpty`), every picture placed must be in the file in the same part with the same bytes, every band the draft left out must be the working copy's band, and it must change something. A draft that fails is returned to the model to fix, and is never saved. |
 | **It knows the format's limits** | When a request needs something a `.docx` written by last-word cannot express, the model reports one of the limits below by id. The person is told the limit and the closest alternative, in the catalogue's words. |
-| **It does not narrate** | `message` is built from the outcome, not taken from the model: "The draft is ready.", plus a sentence only for something that could not be done. |
+| **An alternative is offered, never applied** | While a limit is reported, every document path its alternatives would change (see the table below) keeps the working copy's value: a draft that changes one is set back before it is written, and the self-check refuses a file that still differs there. A draft written before the limit was reported is written again. So the same request gives the same draft whether or not the model applied the alternative, and the message offers it: "The closest alternative, not applied unless you ask for it: ...". The one exception is a request that asks for exactly that change, below; then the draft makes it and the message says so. |
+| **No first-page band nobody asked for** | A draft that adds `page.firstHeader` or `page.firstFooter` when the working copy has none, and the request does not ask for first-page-only, has it written as `page.header` / `page.footer`, which every page shows. An empty one is dropped; one written beside its own `header` / `footer` is refused for the model to fix; the self-check refuses a file that still has one. When the draft does keep a first-page band (the working copy had it, or the request asked), the message adds "The header art appears on the first page only." |
+| **It does not narrate** | `message` is built from the outcome, not taken from the model: "The draft is ready.", plus a sentence only for something that could not be done, an alternative it offers, or a first-page-only band. |
 | **Bounded by the host** | A request over `maxRequestBytes` (16 KiB by default) and a document with more distinct pictures than `maxImages` (32 by default, last-word's own) are refused before any model call, in fixed words. The picture cap is never raised to fit the file. |
 | **Fixed words on failure** | A file that cannot be opened tells the person "The document could not be opened, so nothing was changed." The reader's exception goes to your exception handler through Laravel's `report()`, never into the message. |
 
@@ -113,14 +115,35 @@ the harness makes.
 From [`resources/limits.json`](resources/limits.json). Each entry quotes the last-word document
 that states it, and the test suite fails if that quote is no longer in the installed last-word.
 
-| id | limit | closest alternative |
-|---|---|---|
-| `side-margins-shared` | A Word page has one pair of side margins, shared by the header, the body and the footer. | Zero side margins for the whole page. |
-| `no-bleed-past-margin` | A picture or block always sits inside the page margins. | Zero page margins. |
-| `band-no-chart-or-page-break` | A header or footer cannot hold a chart or a page break. | The chart in the body. |
-| `band-no-footnote` | A header or footer cannot hold a footnote, nor a footnote another. | The note in the body. |
-| `one-page-colour` | One page colour for the whole document. | One colour throughout. |
-| `pictures-png-or-jpeg` | Pictures must be PNG or JPEG. | Convert to PNG. |
+| id | limit | closest alternative | paths kept while reported |
+|---|---|---|---|
+| `side-margins-shared` | A Word page has one pair of side margins, shared by the header, the body and the footer. | Zero side margins for the whole page. | `page.margins.left`, `page.margins.right` |
+| `no-bleed-past-margin` | A picture or block always sits inside the page margins. | Zero page margins. | all four `page.margins` |
+| `band-no-chart-or-page-break` | A header or footer cannot hold a chart or a page break. | The chart in the body. | none |
+| `band-no-footnote` | A header or footer cannot hold a footnote, nor a footnote another. | The note in the body. | none |
+| `one-page-colour` | One page colour for the whole document. | One colour throughout. | none |
+| `pictures-png-or-jpeg` | Pictures must be PNG or JPEG. | Convert to PNG. | none |
+
+A limit with no paths has alternatives that move content (a chart into the body, a note into the
+text) rather than set one value, so there is no single path to keep; for those the rule rests
+on the prompt and on the no-change check.
+
+### When a request asks for the change itself
+
+The test is deliberately narrow, and every doubt counts as "not asked":
+
+- The request must contain one of the limit's `askedBy` phrases from `limits.json`, whole, on
+  word boundaries, ignoring case and spacing. For `side-margins-shared` these all name the
+  whole page or document: "set the side margins to zero for the whole page" asks; "no margins
+  for the header" and "side margins to zero for the header" do not.
+- The digit `0` reads as "zero", so "side margins to 0 for the whole page" asks too.
+- A phrase with a negation in the four words before it does not count: "don't set the side
+  margins to zero for the whole page".
+- A path asked for by any limit's phrases may change even while another reported limit claims
+  it; the request named it.
+
+First-page-only is read the same way, from a fixed list in `Support\Asked::FIRST_PAGE_ONLY`
+("first page only", "only on the first page", "different first page", "first-page header", ...).
 
 ## Testing
 

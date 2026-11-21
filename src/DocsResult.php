@@ -45,17 +45,40 @@ final readonly class DocsResult
         public array $problems = [],
     ) {}
 
+    /**
+     * Introduces an alternative the person may ask for. The draft never
+     * contains it (Workspace reverts it), so the words must not read as done.
+     */
+    public const string OFFER = ' The closest alternative, not applied unless you ask for it: ';
+
+    /** Added when the draft keeps a first-page-only band, so nobody is surprised that page two differs. */
+    public const array FIRST_PAGE_ONLY = [
+        'firstHeader' => 'The header art appears on the first page only.',
+        'firstFooter' => 'The first-page footer appears on the first page only.',
+        'both' => 'The header art and the first-page footer appear on the first page only.',
+    ];
+
     public static function from(Workspace $workspace): self
     {
+        // The owner's rule: the message says what the draft does. An
+        // alternative reads as an offer unless the draft really makes it,
+        // which only happens when the request asked for exactly that.
         $limits = $workspace->limits();
         $notes = array_map(
-            static fn (array $reported): string => $reported['limit']->statement.' The closest alternative: '.lcfirst($reported['limit']->alternatives[$reported['alternative']]),
+            static fn (array $reported): string => $workspace->alternativeApplied($reported['limit'])
+                ? $reported['limit']->statement.' '.$reported['limit']->applied
+                : $reported['limit']->statement.self::OFFER.lcfirst($reported['limit']->alternatives[$reported['alternative']]),
             $limits,
         );
 
         $version = $workspace->source->baseVersion;
         $draft = $workspace->draft();
         if ($draft !== null) {
+            $first = $workspace->firstPageBands();
+            if ($first !== []) {
+                $notes[] = self::FIRST_PAGE_ONLY[count($first) > 1 ? 'both' : $first[0]];
+            }
+
             return new self(Outcome::Ready, implode(' ', [self::READY, ...$notes]), $version, $draft, $limits);
         }
         if ($limits !== []) {
@@ -88,6 +111,8 @@ final readonly class DocsResult
             Problem::PICTURE_MISSING, 'image_unknown' => 'a picture it needed could not be placed.',
             Problem::BAND_CHANGED => 'it would have changed the header or footer, which the request did not ask for.',
             Problem::NO_CHANGE => 'it would not have changed anything.',
+            Problem::ALTERNATIVE_APPLIED => 'it would have made a change that was only to be offered.',
+            Problem::FIRST_PAGE_BAND => 'it would have put the header or footer on the first page only.',
             Problem::UNREADABLE => 'the written file could not be read back.',
             default => 'the document did not pass the writer\'s checks.',
         };

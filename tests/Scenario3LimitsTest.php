@@ -38,7 +38,7 @@ it('states the limit and the closest alternative, and drafts nothing', function 
     expect($result->outcome)->toBe(Outcome::Limit)
         ->and($result->draft)->toBeNull()
         ->and($store->draft())->toBeNull()
-        ->and($result->message)->toBe($limit->statement.' The closest alternative: '.lcfirst($limit->alternatives[0]))
+        ->and($result->message)->toBe($limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]))
         // One short turn: one model request, two sentences, no model prose.
         ->and($model->requests())->toHaveCount(1)
         ->and(preg_match_all('/[.!?](\s|$)/', $result->message))->toBe(2)
@@ -107,7 +107,7 @@ it('says the draft is ready and names the limit when part of a request can be do
     $limit = docsAgent()->catalog()->get('side-margins-shared');
 
     expect($result->outcome)->toBe(Outcome::Ready)
-        ->and($result->message)->toBe(DocsResult::READY.' '.$limit->statement.' The closest alternative: '.lcfirst($limit->alternatives[1]));
+        ->and($result->message)->toBe(DocsResult::READY.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[1]));
 });
 
 it('gives the model every catalogued limit, with its alternatives', function (): void {
