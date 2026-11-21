@@ -13,6 +13,7 @@ final readonly class Limit
      * @param  list<string>  $alternativePaths  the document paths its alternatives would change (`page.margins.left`): OFFERED, never applied, so a draft's change to them is reverted while this limit is reported
      * @param  list<string>  $askedBy  the phrases that make a request ask for that change itself, so it is applied (see Support\Asked)
      * @param  ?string  $applied  what the person is told when the request asked for the change and the draft makes it
+     * @param  list<Expressible>  $expressible  the parts of such a request a .docx CAN do: drafted even while this limit is reported, when the request asks for them
      */
     public function __construct(
         public string $id,
@@ -24,5 +25,6 @@ final readonly class Limit
         public array $alternativePaths = [],
         public array $askedBy = [],
         public ?string $applied = null,
+        public array $expressible = [],
     ) {}
 }

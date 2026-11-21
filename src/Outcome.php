@@ -6,10 +6,14 @@ namespace Prism\AgentDocs;
 
 enum Outcome: string
 {
-    /** A draft passed its checks and is in the store's draft slot. */
+    /**
+     * A draft passed its checks and is in the store's draft slot. It may come
+     * WITH limits (DocsResult::$limits): a partly doable request gets the
+     * doable part drafted and the rest offered, and the message says both.
+     */
     case Ready = 'ready';
 
-    /** Something asked for cannot be done in this format; nothing was drafted. */
+    /** Something asked for cannot be done in this format, and nothing that can be done was asked for; nothing was drafted. */
     case Limit = 'limit';
 
     /** No draft passed its checks; nothing was saved. */

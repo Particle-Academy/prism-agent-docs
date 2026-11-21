@@ -10,6 +10,7 @@ use LastWord\Exceptions\ImageRefused;
 use LastWord\Exceptions\SchemaException;
 use Prism\AgentDocs\Check\Problem;
 use Prism\AgentDocs\Check\SelfCheck;
+use Prism\AgentDocs\Limits\Expressible;
 use Prism\AgentDocs\Limits\Limit;
 use Prism\AgentDocs\Limits\LimitCatalog;
 use Prism\AgentDocs\Pictures\PictureRegistry;
@@ -63,6 +64,9 @@ final class Workspace
 
     private readonly bool $askedFirstPageOnly;
 
+    /** @var array<string, list<Expressible>> limit id => its expressible parts the request asks for */
+    private readonly array $askedParts;
+
     /**
      * @param  string  $request  the person's request, read only for what it EXPLICITLY asks (Support\Asked)
      */
@@ -73,12 +77,15 @@ final class Workspace
         public readonly string $request = '',
     ) {
         $asked = [];
+        $parts = [];
         foreach ($catalog->all() as $limit) {
             if ($limit->alternativePaths !== [] && Asked::forAny($request, $limit->askedBy)) {
                 array_push($asked, ...$limit->alternativePaths);
             }
+            $parts[$limit->id] = array_values(array_filter($limit->expressible, static fn (Expressible $part): bool => Asked::forAny($request, $part->askedBy)));
         }
         $this->askedPaths = array_values(array_unique($asked));
+        $this->askedParts = $parts;
         $this->askedFirstPageOnly = Asked::forAny($request, Asked::FIRST_PAGE_ONLY);
 
         $writer = $source->images;
@@ -232,7 +239,7 @@ final class Workspace
             return $this->refuse([new Problem(Problem::INVALID, '/', $e->getMessage())]);
         }
 
-        $problems = SelfCheck::run($this->source, $composed, $this->imageBytes, $bytes, $kept, $this->options->allowEmpty, $this->offeredPaths(), $this->askedFirstPageOnly ? [] : array_keys(self::FIRST_PAGE_BANDS));
+        $problems = SelfCheck::run($this->source, $composed, $this->imageBytes, $bytes, $kept, $this->options->allowEmpty, $this->offeredPaths(), $this->askedFirstPageOnly ? [] : array_keys(self::FIRST_PAGE_BANDS), $this->requiredParts($composed));
         if ($problems !== []) {
             return $this->refuse($problems, $changed);
         }
@@ -268,6 +275,48 @@ final class Workspace
         }
 
         return array_values(array_unique($paths));
+    }
+
+    /**
+     * The expressible parts a draft of $document must hold: those of every
+     * reported limit that the request asks for, where the document has a band
+     * the part positions. A header distance in a document with no header
+     * changes nothing anyone can see, so it is not asked of the draft.
+     *
+     * None is ever an alternative path (LimitCatalog refuses that), so doing
+     * these never applies what the message only offers.
+     *
+     * @param  array<mixed>  $document
+     * @return list<Expressible>
+     */
+    public function requiredParts(array $document): array
+    {
+        $parts = [];
+        foreach ($this->limits as $reported) {
+            foreach ($this->askedParts[$reported['limit']->id] ?? [] as $part) {
+                if ($part->applies($document)) {
+                    $parts[$part->path] ??= $part;
+                }
+            }
+        }
+
+        return array_values($parts);
+    }
+
+    /**
+     * What the run would hand over leaves out of the doable part: the problem
+     * for each required part that the passing draft, or with no draft the
+     * working copy, does not hold. DocsAgent returns these to the model before
+     * it composes the result, so reporting a limit cannot end an edit that had
+     * something to do.
+     *
+     * @return list<Problem>
+     */
+    public function skippedParts(): array
+    {
+        $document = $this->drafted ?? $this->source->named;
+
+        return SelfCheck::skipped($document, $this->requiredParts($document));
     }
 
     /**
@@ -343,11 +392,18 @@ final class Workspace
                     $again = $this->attempt(...$this->accepted);
                     $note = $again['ok']
                         ? 'Recorded. Your draft made the alternative\'s change, which is offered to the person, not applied; it was taken out and the draft written again. End your turn with one short line.'
-                        : 'Recorded. Your draft made the alternative\'s change, which is offered to the person, not applied; without it the draft changed nothing, so there is no draft. End your turn with one short line.';
+                        : 'Recorded. Your draft made the alternative\'s change, which is offered to the person, not applied; without it the draft did not pass its checks, so there is no draft. End your turn with one short line.';
 
                     break;
                 }
             }
+        }
+
+        // A limit is a reason to offer the rest, never to skip what can be
+        // done. When the request asks for a part the format holds, say so now.
+        $skipped = $this->skippedParts();
+        if ($skipped !== []) {
+            return ['ok' => true, 'note' => 'Recorded; the person will be told the limit and offered the alternative, which is not applied. Part of the request CAN be done, and is not done yet: call write_draft with it (see problems), then end your turn with one short line.', 'problems' => array_map(static fn (Problem $p): array => $p->toArray(), $skipped)];
         }
 
         return ['ok' => true, 'note' => $note];

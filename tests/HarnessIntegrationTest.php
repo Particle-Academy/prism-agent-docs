@@ -66,7 +66,7 @@ it('is callable by a parent agent as one tool, which returns the outcome and nev
     $tool = docsAgent()->tool(Participant::create(['name' => 'Owner']), $store);
     $answer = json_decode((string) $tool->handle(request: 'Title it Letter.'), true);
 
-    expect($answer)->toBe(['outcome' => Outcome::Ready->value, 'message' => 'The draft is ready.']);
+    expect($answer)->toBe(['outcome' => Outcome::Ready->value, 'message' => 'The draft is ready.', 'limits' => []]);
 });
 
 it('fails closed on a saved file that is not a document, without calling the model', function (): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Prism\AgentDocs;
 
 use LastWord\Agent;
+use Prism\AgentDocs\Check\Problem;
 use Prism\AgentDocs\Limits\LimitCatalog;
 
 /** The words the model is given: the mode's system prompt, and each edit's opening message. */
@@ -24,9 +25,10 @@ final class Prompt
            - To drop a band on purpose, list it in `remove`. Only when the request asks for that.
         3. Pictures are placed by name: `{"type": "image", "src": "image:NAME"}`. The message lists every picture in the document, wherever it is (body, header, footer). Never invent a name and never paste image data.
         4. write_draft re-opens the written file and checks it. If it answers with problems, fix exactly those and call it again. Never give up silently: if you cannot fix it, stop, and the person is told.
-        5. If the request needs something this format cannot express (see Limits), call report_limit with the limit's id and the closest alternative's number. The alternative is OFFERED to the person, never applied: do not put it in a draft unless the request asks for exactly that change. Do not write a draft that changes nothing and present it as the change. If part of the request can be done, draft that part as well.
-        6. Use `page.header` and `page.footer` for anything every page should show. Use `firstHeader` / `firstFooter` only when the document already has one or the request asks for something on the first page only.
-        7. When you are done, end your turn with one short line. The person is told the outcome by the host; do not describe what you built.
+        5. If the request needs something this format cannot express (see Limits), call report_limit with the limit's id and the closest alternative's number. The alternative is OFFERED to the person, never applied: do not put it in a draft unless the request asks for exactly that change. Do not write a draft that changes nothing and present it as the change.
+        6. A request can be PARTLY doable. Reporting a limit never ends the edit by itself: when a limit applies, still do the parts of the request this format can express, and report the limit as well. Each limit lists, under "Can still be done", the parts it can; when the request asks for one, put it in a write_draft call. "Use no margins for the header" in a document with a header is the example: the side margins cannot differ (report `side-margins-shared`), but the header distance can be zero (write `page.margins.header` as 0), and the side margins stay as they are.
+        7. Use `page.header` and `page.footer` for anything every page should show. Use `firstHeader` / `firstFooter` only when the document already has one or the request asks for something on the first page only.
+        8. When you are done, end your turn with one short line. The person is told the outcome by the host; do not describe what you built.
 
         ## Limits
 
@@ -37,6 +39,22 @@ final class Prompt
         ## The writer's guide (from particle-academy/last-word)
 
         TXT."\n\n".Agent::guide();
+    }
+
+    /**
+     * The message that returns a run to the model when it reported a limit
+     * and skipped a part of the request the format can do. Only catalogue
+     * words and fixed text: nothing from the document or the model.
+     *
+     * @param  list<Problem>  $problems
+     */
+    public static function pushback(array $problems): string
+    {
+        return implode("\n", [
+            'CHECK FAILED: the edit is not finished. The limit you reported stays reported, and its alternative stays offered, not applied. But the request also asks for something this format CAN do, and what you would hand over does not do it:',
+            json_encode(array_map(static fn (Problem $p): array => $p->toArray(), $problems), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'Call write_draft with that change, starting from the document to revise, then end your turn with one short line.',
+        ]);
     }
 
     public static function opening(string $request, Workspace $workspace): string

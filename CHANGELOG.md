@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.3]
+
+A fix from the G-316 live lab run 01a2002d (scenario S4, claude-sonnet-5-5).
+
+No breaking changes. Nothing in the public API is removed or renamed. The `edit_document` tool's answer gains a `limits` key, and a request that is partly doable now gets a draft where it used to get only the limit.
+
+### Fixed
+
+- **Do what can be done, offer the rest.** "Use no margins for the header", on a letterhead with a header, reported `side-margins-shared` and wrote no draft, so the person heard only about the side margins. The header DISTANCE, `page.margins.header`, is something a `.docx` holds. A request can be partly doable, and reporting a limit no longer ends the edit: while a limit is reported, each of its doable parts that the request asks for must be in the draft. A draft without one is refused for the model to fix, and a run that ends without one is returned to the model once. The result is `Ready` with the limit, and the message is "The draft is ready." plus the offer. The side margins are never changed: a doable part can never be an alternative path.
+- **"Set it to 0." reads as zero.** The narrow request matcher read the digit 0 as "zero" only when no full stop followed it, so a sentence ending in "0." did not count. A 0 before a digit ("0.5") still does not.
+
+### Added
+
+- `expressible` in `resources/limits.json`: the parts of a limited request a `.docx` can do, each with its path, value, an instruction for the model, the phrases that ask for it, the bands it needs and its last-word sources. `side-margins-shared` and `no-bleed-past-margin` list the header and footer distances. The catalogue refuses one that is an alternative path.
+- `Expressible` (in `Limits`), `Limit::$expressible`, `Workspace::requiredParts()` and `Workspace::skippedParts()`.
+- A self-check rule and problem code, `expressible_part_skipped`.
+- `DocsAgent::PUSHBACKS` (1): how many times a run that skipped a doable part is returned to the model.
+- `DocsResult::limitIds()`; `edit_document` answers with `limits` too.
+- The system prompt says a request can be partly doable and lists each limit's doable parts. The code above is what enforces it.
+- Mutants M27 to M37 in `tools/mutation-check.php`.
+
+### Tests
+
+- `tests/Support/ScriptedModel.php` now answers with the whole conversation, the request's messages first, as Prism's provider handlers do. It used to return only the new turns, so a second send on a thread reached the model without the person's first message.
+
 ## [0.1.2]
 
 Two fixes from a live test of 0.1.0 against a real letterhead.

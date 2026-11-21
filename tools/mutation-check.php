@@ -244,6 +244,74 @@ $mutants = [
         'edits' => [['src/DocsResult.php', '$notes[] = self::FIRST_PAGE_ONLY[count($first) > 1 ? \'both\' : $first[0]];', '']],
         'tests' => ['tests/OfferNotApplyTest.php'],
     ],
+    // G-316 lab run 01a2002d, scenario S4: a limit is a reason to offer the
+    // rest, never to skip the part the format can do.
+    'M27' => [
+        'seam' => 'the self-check refuses a draft without a requested doable part (expressible_part_skipped)',
+        'mutation' => 'skip that check',
+        'edits' => [['src/Check/SelfCheck.php', 'array_push($problems, ...self::skipped($produced, $expressible));', '']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M28' => [
+        'seam' => 'a run that reported the limit and skipped the doable part is returned to the model',
+        'mutation' => 'never push back',
+        'edits' => [['src/DocsAgent.php', '$skipped = $workspace->skippedParts();', '$skipped = [];']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M29' => [
+        'seam' => 'a doable part is asked only when the document has the band it positions',
+        'mutation' => 'ask for the header distance in a document with no header',
+        'edits' => [['src/Workspace.php', 'if ($part->applies($document)) {', 'if (true) {']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php', 'tests/Scenario3LimitsTest.php'],
+    ],
+    'M30' => [
+        'seam' => 'a doable part is asked only when the request names it',
+        'mutation' => 'ask for every doable part of a reported limit',
+        'edits' => [['src/Workspace.php', 'static fn (Expressible $part): bool => Asked::forAny($request, $part->askedBy)', 'static fn (Expressible $part): bool => true']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M31' => [
+        'seam' => 'the request is read for the doable part at all',
+        'mutation' => 'never read the request as asking for one',
+        'edits' => [['src/Workspace.php', 'static fn (Expressible $part): bool => Asked::forAny($request, $part->askedBy)', 'static fn (Expressible $part): bool => false']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M32' => [
+        'seam' => 'the doable part is held only at its value ("no margins" is zero)',
+        'mutation' => 'accept any value written at the path',
+        'edits' => [['src/Limits/Expressible.php', 'return $has && (is_int($value) || is_float($value)) && (float) $value === (float) $this->value;', 'return $has;']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M33' => [
+        'seam' => 'report_limit tells the model the doable part is still to do',
+        'mutation' => 'say nothing of it',
+        'edits' => [['src/Workspace.php', '$skipped = $this->skippedParts();', '$skipped = [];']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M34' => [
+        'seam' => 'no doable part is an alternative path, so doing it never applies an offer',
+        'mutation' => 'drop the catalogue\'s overlap check',
+        'edits' => [['src/Limits/LimitCatalog.php', 'if (in_array($part->path, $offered, true)) {', 'if (false) {']],
+        'tests' => ['tests/LimitsCatalogTest.php'],
+    ],
+    'M35' => [
+        'seam' => 'the model is shown each limit\'s doable parts',
+        'mutation' => 'leave them out of the prompt',
+        'edits' => [['src/Limits/LimitCatalog.php', '$lines[] = sprintf(\'  Can still be done', '$unused = sprintf(\'  Can still be done']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M36' => [
+        'seam' => 'a sentence-final "0." reads as zero',
+        'mutation' => 'the 0.1.2 reading, which a full stop defeats',
+        'edits' => [['src/Support/Asked.php', '0(?!\w|\.\d)/u', '0(?![\w.])/u']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M37' => [
+        'seam' => '"0.5" does not read as zero',
+        'mutation' => 'read a 0 before any point as zero',
+        'edits' => [['src/Support/Asked.php', '0(?!\w|\.\d)/u', '0(?!\w)/u']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
 ];
 
 $only = array_slice($argv, 1);

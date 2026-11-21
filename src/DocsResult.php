@@ -103,6 +103,18 @@ final readonly class DocsResult
         return $this->outcome === Outcome::Ready;
     }
 
+    /**
+     * The ids of the limits the message offers alternatives for. With a
+     * draft, this is "ready with limits": the doable part is drafted and the
+     * rest is offered.
+     *
+     * @return list<string>
+     */
+    public function limitIds(): array
+    {
+        return array_map(static fn (array $reported): string => $reported['limit']->id, $this->limits);
+    }
+
     /** The person's words for a problem: never a JSON path, never a model instruction. */
     private static function plain(Problem $problem): string
     {
@@ -113,6 +125,7 @@ final readonly class DocsResult
             Problem::NO_CHANGE => 'it would not have changed anything.',
             Problem::ALTERNATIVE_APPLIED => 'it would have made a change that was only to be offered.',
             Problem::FIRST_PAGE_BAND => 'it would have put the header or footer on the first page only.',
+            Problem::EXPRESSIBLE_PART_SKIPPED => 'it left out a part of the request the document can do.',
             Problem::UNREADABLE => 'the written file could not be read back.',
             default => 'the document did not pass the writer\'s checks.',
         };
