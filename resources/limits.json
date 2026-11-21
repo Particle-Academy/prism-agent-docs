@@ -1,0 +1,120 @@
+{
+    "about": "What a .docx written by particle-academy/last-word cannot express. Each entry quotes the last-word document that states it; tests/LimitsCatalogTest.php fails when a quote is no longer in the installed last-word, so a limit last-word lifts, or rewords, cannot linger here unnoticed. The statement and alternatives are what the person is told, so they are plain words.",
+    "verifiedAgainst": "particle-academy/last-word 0.21.0",
+    "limits": [
+        {
+            "id": "side-margins-shared",
+            "statement": "A Word page has one pair of side margins, shared by the header, the body and the footer, so the header cannot have different side margins from the body.",
+            "appliesWhen": "The request asks for the header or footer to use different left or right margins from the body: no margins for the header only, header art edge to edge while the body keeps its margins, a wider footer.",
+            "alternatives": [
+                "Set the side margins to zero for the whole page, so the header art runs edge to edge and the body text does too.",
+                "Keep the header art inside the page margins, as it is now."
+            ],
+            "sources": [
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "README.md",
+                    "section": "Page geometry",
+                    "quote": "`page.margins` takes `top`, `right`, `bottom`, `left` and the header and footer **distances**, `header` / `footer`: points from the top edge of the page to the header and from the bottom edge to the footer"
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Schema/Schema.php",
+                    "section": "$defs.pageMargins",
+                    "quote": "Page margins in points, 72 (one inch) each side by default, and the header and footer DISTANCES: how far the header sits from the top edge of the page and the footer from the bottom edge"
+                }
+            ]
+        },
+        {
+            "id": "no-bleed-past-margin",
+            "statement": "A picture or other block always sits inside the page margins; it cannot run past them to the edge of the page.",
+            "appliesWhen": "The request asks for a picture, band or block to bleed off the page, run to the page edge, or sit partly in the margin, while the margins stay.",
+            "alternatives": [
+                "Set the page margins to zero, so the picture can reach the edge of the page.",
+                "Keep the picture inside the margins at the full width of the text."
+            ],
+            "council": "Fancy CC-fancy-0055 (pending): whether last-word should offer a bleed. Until it lands, the documented behaviour below is the limit.",
+            "sources": [
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "README.md",
+                    "section": "Document model",
+                    "quote": "the writer sniffs intrinsic size straight from the PNG IHDR / JPEG SOF bytes and caps at 6.5in page width keeping aspect."
+                },
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "src/Schema/Schema.php",
+                    "section": "chart.widthPx",
+                    "quote": "Width in px at 96 dpi; capped at the text column."
+                }
+            ]
+        },
+        {
+            "id": "band-no-chart-or-page-break",
+            "statement": "A header or footer cannot hold a chart or a page break.",
+            "appliesWhen": "The request asks for a chart, or a page break, inside the header or footer.",
+            "alternatives": [
+                "Put the chart in the body, at the top of the first page.",
+                "Put the figure in the header as a picture instead of a chart."
+            ],
+            "sources": [
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "README.md",
+                    "section": "Headers and footers: a band, or blocks",
+                    "quote": "A blocks header takes every block type except `chart` and `pageBreak`, at any depth"
+                }
+            ]
+        },
+        {
+            "id": "band-no-footnote",
+            "statement": "A header or footer cannot hold a footnote, and a footnote cannot hold another footnote.",
+            "appliesWhen": "The request asks for a footnote in the header or footer, or a footnote on a footnote.",
+            "alternatives": [
+                "Put the note in the body text, as a footnote on the first page.",
+                "Write the note into the header or footer as plain small text."
+            ],
+            "sources": [
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "README.md",
+                    "section": "Footnotes",
+                    "quote": "but not inside another footnote and not in a header or footer"
+                }
+            ]
+        },
+        {
+            "id": "one-page-colour",
+            "statement": "A Word document has one page colour for every page; one part of it cannot have a different background.",
+            "appliesWhen": "The request asks for a different page background on some pages or after a page break.",
+            "alternatives": [
+                "Use one page colour for the whole document.",
+                "Shade the paragraphs or table on those pages instead of the page."
+            ],
+            "sources": [
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "README.md",
+                    "section": "Mixed pages",
+                    "quote": "`page.background` on a break is refused: Word has one page colour per document."
+                }
+            ]
+        },
+        {
+            "id": "pictures-png-or-jpeg",
+            "statement": "Pictures must be PNG or JPEG; other formats such as SVG, GIF or EMF cannot be placed.",
+            "appliesWhen": "The request asks to place a picture that is not PNG or JPEG.",
+            "alternatives": [
+                "Convert the picture to PNG and place that."
+            ],
+            "sources": [
+                {
+                    "package": "particle-academy/last-word",
+                    "file": "README.md",
+                    "section": "Headers and footers: a band, or blocks (Hardening)",
+                    "quote": "A header or footer image, whether an agent wrote it or `read()` took it from an upload, must be PNG or JPEG by its leading bytes as well as its type"
+                }
+            ]
+        }
+    ]
+}
