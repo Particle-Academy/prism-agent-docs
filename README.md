@@ -15,6 +15,11 @@ named harness agent.
 
 ## Usage
 
+The host decides which document is revised. The agent never chooses between the saved file
+and a draft: it revises the **working copy** it is given.
+
+### With a `DocumentStore` (the default policy)
+
 ```php
 use Prism\AgentDocs\DocsAgent;
 use Prism\AgentDocs\DocsOptions;
@@ -26,22 +31,54 @@ final class LetterStore implements DocumentStore
     public function __construct(private Letter $letter) {}
 
     public function saved(): ?string { return $this->letter->docx; }        // null: create one
-    public function draft(): ?string { return $this->letter->draft_docx; }  // never read by the agent
+    public function draft(): ?string { return $this->letter->draft_docx; }
     public function putDraft(string $bytes): void { $this->letter->update(['draft_docx' => $bytes]); }
 }
 
 $result = app(DocsAgent::class)->edit(
     participant: $user,
-    store: new LetterStore($letter),
-    request: 'Put the divider under the logo and set the header distance to zero.',
+    document: new LetterStore($letter),
+    request: 'Now make the logo bigger.',
     options: new DocsOptions(images: ['new-logo' => $pngBytes]),   // optional extra pictures
     scope: 'letter:'.$letter->id,
 );
 
-$result->outcome;   // Outcome::Ready, Limit, Failed or NoChange
-$result->message;   // what to show the person, e.g. "The draft is ready."
-$result->draft;     // the checked .docx, already written to the store's draft slot
+$result->outcome;       // Outcome::Ready, Limit, Failed or NoChange
+$result->message;       // what to show the person, e.g. "The draft is ready."
+$result->draft;         // the checked .docx, already written to the store's draft slot
+$result->baseVersion;   // the saved version the draft derives from (see below)
 ```
+
+A store's working copy is **the pending draft when it holds something** (any text or picture,
+in the body, a header or a footer), **otherwise the saved file**. So "now make the logo bigger"
+revises the draft the person is looking at, and an empty draft is never a starting point. Its
+`baseVersion` is always the SAVED file's, `WorkingCopy::versionOf($saved)`: a `sha256:` digest,
+or `none` when nothing is saved.
+
+### With a working copy of your own
+
+```php
+use Prism\AgentDocs\WorkingCopy;
+
+$result = app(DocsAgent::class)->edit(
+    participant: $user,
+    document: new WorkingCopy($bytesToRevise, baseVersion: (string) $letter->revision),
+    request: 'Retitle it.',
+);
+
+$result->draft;         // nothing is written anywhere: keep it yourself
+```
+
+`WorkingCopy` takes the bytes to revise (`null` to create a document) and an opaque, non-empty
+`baseVersion`: your identifier of the saved version those bytes derive from. The bytes are used
+verbatim.
+
+### Saving: the base version is yours to check
+
+The agent never saves. `DocsResult::$baseVersion` is the working copy's, handed back unchanged.
+When the person accepts a draft, **check that the saved file is still that version, and refuse
+(or re-run the edit) if it has moved on**. Without that check, accepting a draft can silently
+overwrite a save made while the edit ran.
 
 Pick the model the usual harness way (`prism-harness.agents.docs.provider` / `.model`, or the
 global defaults). The agent runs in its own harness namespace, `docs`, with one mode, `edit`, and
@@ -51,18 +88,22 @@ three tools; it adds nothing to your other agents.
 
 `DocsAgent::tool($user, $store)` is a Prism tool, `edit_document`, that a parent agent can be
 given. It answers with `{"outcome": "...", "message": "..."}` and never with the document model's
-own text, so nothing in a document reaches the parent as instructions.
+own text, so nothing in a document reaches the parent as instructions. It takes a store, and
+each call resolves the store's working copy afresh, so a second request continues the first one's
+draft.
 
 ## What it guarantees
 
 | | |
 |---|---|
-| **Every picture is placed by name** | Every picture in the saved file, in the body, a table, a footnote and every header and footer, is registered with the writer as `image:picture-N` and listed to the model. A picture is never missing because it sat in the header. |
-| **It starts from the saved file** | The model is shown `DocumentStore::saved()`. The draft slot is only ever written, so an empty pending draft is replaced, never revised. |
-| **What a draft leaves out is kept** | A draft that omits `page.header` (or the footer, the body, the title, a margin) keeps the saved one. A band is dropped only when the draft lists it in `remove`. |
-| **It checks the file it wrote** | The written `.docx` is re-opened with last-word's reader. It must not be empty (unless the host passes `allowEmpty`), every picture placed must be in the file in the same part with the same bytes, every band the draft left out must be the saved band, and it must change something. A draft that fails is returned to the model to fix, and is never saved. |
+| **Every picture is placed by name** | Every picture in the working copy, in the body, a table, a footnote and every header and footer, is registered with the writer as `image:picture-N` and listed to the model. A picture is never missing because it sat in the header. |
+| **The host chooses what is revised** | The model is shown the working copy and nothing else. With a store, that is the pending draft when it holds something, otherwise the saved file, so an empty draft is replaced, never revised. The saved file is never written. |
+| **What a draft leaves out is kept** | A draft that omits `page.header` (or the footer, the body, the title, a margin) keeps the working copy's. A band is dropped only when the draft lists it in `remove`. |
+| **It checks the file it wrote** | The written `.docx` is re-opened with last-word's reader. It must not be empty (unless the host passes `allowEmpty`), every picture placed must be in the file in the same part with the same bytes, every band the draft left out must be the working copy's band, and it must change something. A draft that fails is returned to the model to fix, and is never saved. |
 | **It knows the format's limits** | When a request needs something a `.docx` written by last-word cannot express, the model reports one of the limits below by id. The person is told the limit and the closest alternative, in the catalogue's words. |
 | **It does not narrate** | `message` is built from the outcome, not taken from the model: "The draft is ready.", plus a sentence only for something that could not be done. |
+| **Bounded by the host** | A request over `maxRequestBytes` (16 KiB by default) and a document with more distinct pictures than `maxImages` (32 by default, last-word's own) are refused before any model call, in fixed words. The picture cap is never raised to fit the file. |
+| **Fixed words on failure** | A file that cannot be opened tells the person "The document could not be opened, so nothing was changed." The reader's exception goes to your exception handler through Laravel's `report()`, never into the message. |
 
 No credentials are read, and nothing is fetched: the only network traffic is the model call
 the harness makes.

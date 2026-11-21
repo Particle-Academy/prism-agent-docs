@@ -85,26 +85,47 @@ final class DocsAgent
     }
 
     /**
-     * Edit the store's saved document (or create one) as the request asks.
+     * Revise the document the host chose (or create one) as the request asks.
      *
-     * On success the draft is written to the store's draft slot, replacing
-     * whatever was there. The saved file is never written.
+     * `$document` is either the HOST's working copy, used verbatim, or a
+     * DocumentStore, whose working copy is WorkingCopy::fromStore()'s: the
+     * pending draft when it holds something, otherwise the saved file.
+     *
+     * With a store, a draft that passed its checks is written to the draft
+     * slot, replacing whatever was there. With a working copy, nothing is
+     * written anywhere: the draft is in the result for the host to keep. The
+     * saved file is never written, either way, and the result's baseVersion is
+     * the working copy's, for the host to check before it saves.
      */
-    public function edit(Model|ParticipantRef $participant, DocumentStore $store, string $request, DocsOptions $options = new DocsOptions, ?string $scope = null): DocsResult
+    public function edit(Model|ParticipantRef $participant, WorkingCopy|DocumentStore $document, string $request, DocsOptions $options = new DocsOptions, ?string $scope = null): DocsResult
     {
         $this->install();
 
+        $version = $document instanceof WorkingCopy ? $document->baseVersion : WorkingCopy::versionOf($document->saved());
+
+        if (strlen($request) > $options->maxRequestBytes) {
+            return DocsResult::failed(DocsResult::REQUEST_TOO_LONG, $version);
+        }
+
         try {
-            $source = Source::fromStore($store);
+            $copy = $document instanceof WorkingCopy ? $document : WorkingCopy::fromStore($document);
+            $source = Source::fromWorkingCopy($copy);
         } catch (Throwable $e) {
-            return DocsResult::failed('The saved file could not be opened: '.$e->getMessage());
+            // The reader's words stay with the host: an exception's text is
+            // neither written for the person nor safe to show them.
+            report($e);
+
+            return DocsResult::failed(DocsResult::UNREADABLE, $version);
         }
 
         $workspace = new Workspace($source, $this->catalog, $options);
+        if ($workspace->pictureCount() > $options->maxImages) {
+            return DocsResult::failed(DocsResult::TOO_MANY_PICTURES, $version);
+        }
         try {
             $workspace->assertWritable();
         } catch (ImageRefused $e) {
-            return DocsResult::failed(sprintf('A picture in the saved file is one the writer refuses (%s), so it could not be kept.', $e->reason));
+            return DocsResult::failed(sprintf('A picture in the document is one the writer refuses (%s), so it could not be kept.', $e->reason), $version);
         }
 
         $session = $this->harness->forAgent($this->agent)->session($participant, $scope);
@@ -125,8 +146,8 @@ final class DocsAgent
         }
 
         $result = DocsResult::from($workspace);
-        if ($result->draft !== null) {
-            $store->putDraft($result->draft);
+        if ($result->draft !== null && $document instanceof DocumentStore) {
+            $document->putDraft($result->draft);
         }
 
         return $result;
@@ -134,6 +155,10 @@ final class DocsAgent
 
     /**
      * The agent as one tool a parent agent can call.
+     *
+     * It takes a store, not a working copy: each call resolves the store's
+     * working copy afresh and writes its draft back, so a second request
+     * continues the first one's draft.
      *
      * What comes back to the parent is the composed outcome and message, never
      * the child model's text, so nothing the child read (a hostile document,

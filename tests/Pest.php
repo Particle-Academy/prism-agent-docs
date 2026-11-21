@@ -6,6 +6,7 @@ use Prism\AgentDocs\DocsAgent;
 use Prism\AgentDocs\DocsOptions;
 use Prism\AgentDocs\DocsResult;
 use Prism\AgentDocs\DocumentStore;
+use Prism\AgentDocs\WorkingCopy;
 use Tests\Fixtures\Participant;
 use Tests\Support\ScriptedModel;
 use Tests\TestCase;
@@ -32,7 +33,7 @@ function shownToModel(ScriptedModel $model): string
     return implode("\n", $parts);
 }
 
-function editDocument(DocumentStore $store, string $request, DocsOptions $options = new DocsOptions): DocsResult
+function editDocument(WorkingCopy|DocumentStore $document, string $request, DocsOptions $options = new DocsOptions): DocsResult
 {
-    return docsAgent()->edit(Participant::create(['name' => 'Owner']), $store, $request, $options);
+    return docsAgent()->edit(Participant::create(['name' => 'Owner']), $document, $request, $options);
 }

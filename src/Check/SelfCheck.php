@@ -21,18 +21,19 @@ use Throwable;
  *     saved result held no text and no picture).
  *  2. Every picture the draft places is in the file, in the same part, with
  *     the same bytes (scenario 1: a header logo that is not in the header).
- *  3. Every band the draft did not mention is the saved file's band, as Word
- *     would write it (owner rule: a rewrite that says nothing of the header
- *     keeps the header).
- *  4. It changes something. A draft identical to the saved file presented as
- *     the change is scenario 3's failure.
+ *  3. Every band the draft did not mention is the working copy's band, as
+ *     Word would write it (owner rule: a rewrite that says nothing of the
+ *     header keeps the header). The working copy is the document the host
+ *     chose to revise, so a continued draft's header is the one kept.
+ *  4. It changes something. A draft identical to the working copy presented
+ *     as the change is scenario 3's failure.
  */
 final class SelfCheck
 {
     /**
      * @param  array<string, mixed>  $intended  the composed draft, pictures as `image:NAME` or data URLs
      * @param  array<string, string>  $images  every registered picture, name => bytes
-     * @param  list<string>  $keptBands  bands the draft did not mention, carried from the saved file
+     * @param  list<string>  $keptBands  bands the draft did not mention, carried from the working copy
      * @return list<Problem>
      */
     public static function run(Source $source, array $intended, array $images, string $bytes, array $keptBands, bool $allowEmpty): array
@@ -54,7 +55,7 @@ final class SelfCheck
         array_push($problems, ...self::bands($source, $produced, $keptBands));
 
         if ($problems === [] && $source->exists() && Agent::equivalent($produced, $source->read)) {
-            $problems[] = new Problem(Problem::NO_CHANGE, '/', 'This draft is identical to the saved file, so it changes nothing. If the request cannot be done in this format, call report_limit instead of writing a draft.');
+            $problems[] = new Problem(Problem::NO_CHANGE, '/', 'This draft is identical to the document you were given, so it changes nothing. If the request cannot be done in this format, call report_limit instead of writing a draft.');
         }
 
         return $problems;
@@ -107,20 +108,20 @@ final class SelfCheck
      */
     private static function bands(Source $source, array $produced, array $keptBands): array
     {
-        $saved = is_array($source->read['page'] ?? null) ? $source->read['page'] : [];
+        $base = is_array($source->read['page'] ?? null) ? $source->read['page'] : [];
         $now = is_array($produced['page'] ?? null) ? $produced['page'] : [];
 
         $problems = [];
         foreach ($keptBands as $band) {
-            if (! isset($saved[$band])) {
+            if (! isset($base[$band])) {
                 continue;
             }
             if (! isset($now[$band])) {
-                $problems[] = new Problem(Problem::BAND_CHANGED, '/page/'.$band, sprintf('The saved file has a %s and the draft lost it. Leave page.%s out of the draft to keep it, or list it in remove only if the request asks for that.', $band, $band));
+                $problems[] = new Problem(Problem::BAND_CHANGED, '/page/'.$band, sprintf('The document you were given has a %s and the draft lost it. Leave page.%s out of the draft to keep it, or list it in remove only if the request asks for that.', $band, $band));
 
                 continue;
             }
-            if (! Agent::equivalent(['blocks' => [], 'page' => [$band => $saved[$band]]], ['blocks' => [], 'page' => [$band => $now[$band]]])) {
+            if (! Agent::equivalent(['blocks' => [], 'page' => [$band => $base[$band]]], ['blocks' => [], 'page' => [$band => $now[$band]]])) {
                 $problems[] = new Problem(Problem::BAND_CHANGED, '/page/'.$band, sprintf('The request did not change the %s, but the written file has a different one. Leave page.%s out of the draft to keep it.', $band, $band));
             }
         }

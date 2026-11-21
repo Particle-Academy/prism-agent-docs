@@ -19,6 +19,10 @@ use Tests\Support\ScriptedModel;
 | nothing. Ask: any revision of the header. Pass: the writer is shown the
 | SAVED file's content, and the new draft replaces the empty one.
 |
+| A draft that DOES hold something is continued instead (WorkingCopyTest):
+| the rule is that an empty draft is never a starting point, not that a draft
+| never is.
+|
 */
 
 function swapHeaderPictures(): array
@@ -39,7 +43,7 @@ it('shows the writer the saved file, not the empty pending draft', function (): 
 
     // What the model saw is the saved letterhead: its header and its pictures.
     expect(shownToModel($model))
-        ->toContain('THE SAVED DOCUMENT')
+        ->toContain('THE DOCUMENT TO REVISE')
         ->toContain('"header":{"blocks":[{"type":"image","src":"image:picture-1"')
         ->toContain('image:picture-1 in /page/header')
         ->toContain('"footer":{"center":"{page}"}');
@@ -60,15 +64,16 @@ it('replaces the empty draft with the new one', function (): void {
         ->and(Agent::read($draft)['page']['footer'])->toBe(['center' => '{page}']);
 });
 
-it('never reads the pending draft at all', function (): void {
-    // A stronger statement than "it chose the saved file": the draft slot is
-    // write-only to this agent, whatever the draft holds.
-    $store = new InMemoryDocumentStore(Letterheads::headerLetterhead(), Letterheads::bodyLetterhead());
-    ScriptedModel::install([swapHeaderPictures(), 'Done.']);
+it('starts from the saved file when the draft holds only blank bands', function (): void {
+    // "Holds something" means text or a picture, not "has a header element".
+    $hollow = Agent::toBytes(['blocks' => [], 'page' => ['header' => ['blocks' => [['type' => 'paragraph', 'runs' => [['text' => '   ']]]]]]]);
+    $store = new InMemoryDocumentStore(Letterheads::headerLetterhead(), $hollow);
+    $model = ScriptedModel::install([swapHeaderPictures(), 'Done.']);
 
-    editDocument($store, 'Put the divider above the logo in the header.');
+    $result = editDocument($store, 'Put the divider above the logo in the header.');
 
-    expect($store->draftReads())->toBe(0);
+    expect($result->outcome)->toBe(Outcome::Ready)
+        ->and(shownToModel($model))->toContain('image:picture-1 in /page/header');
 });
 
 it('creates a document when nothing is saved, with a picture the host offers', function (): void {
@@ -84,6 +89,6 @@ it('creates a document when nothing is saved, with a picture the host offers', f
     $result = editDocument($store, 'Start a minutes document with our logo in the header.', new DocsOptions(images: ['logo' => Letterheads::logo()]));
 
     expect($result->outcome)->toBe(Outcome::Ready)
-        ->and(shownToModel($model))->toContain('THERE IS NO SAVED DOCUMENT YET')->toContain('- image:logo')
+        ->and(shownToModel($model))->toContain('THERE IS NO DOCUMENT YET')->toContain('- image:logo')
         ->and(Letterheads::picturesByPart((string) $store->draft()))->toBe(['/page/header' => [hash('sha256', Letterheads::logo())]]);
 });

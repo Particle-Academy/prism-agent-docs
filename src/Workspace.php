@@ -16,7 +16,7 @@ use Prism\AgentDocs\Pictures\PictureRegistry;
 use Prism\AgentDocs\Support\DocumentTree;
 
 /**
- * One edit's state: the saved document it starts from, the pictures it may
+ * One edit's state: the working copy it starts from, the pictures it may
  * place, the draft that passed its checks, and any limit it reported.
  *
  * The tools the model calls are thin wrappers over writeDraft() and
@@ -25,10 +25,10 @@ use Prism\AgentDocs\Support\DocumentTree;
  */
 final class Workspace
 {
-    /** Top-level keys a draft keeps from the saved file when it leaves them out. */
+    /** Top-level keys a draft keeps from the working copy when it leaves them out. */
     private const array CARRIED = ['title', 'meta', 'blocks'];
 
-    /** Page keys a draft keeps from the saved file when it leaves them out (margins merge side by side). */
+    /** Page keys a draft keeps from the working copy when it leaves them out (margins merge side by side). */
     private const array CARRIED_PAGE = ['size', 'orientation', 'background', 'border'];
 
     /** @var array<string, mixed> name => what last-word's `images` option takes */
@@ -56,7 +56,7 @@ final class Workspace
         $bytes = $source->images;
         foreach ($options->images as $name => $image) {
             if (isset($writer[$name]) || str_starts_with($name, PictureRegistry::PREFIX)) {
-                throw new InvalidArgumentException(sprintf('The host image name "%s" is taken: names starting "%s" are the saved file\'s own pictures.', $name, PictureRegistry::PREFIX));
+                throw new InvalidArgumentException(sprintf('The host image name "%s" is taken: names starting "%s" are the working copy\'s own pictures.', $name, PictureRegistry::PREFIX));
             }
             $writer[$name] = $image;
             $bytes[$name] = self::bytesOf($image) ?? throw new InvalidArgumentException(sprintf('The host image "%s" is not PNG or JPEG bytes, a data URL, or {data: ...}.', $name));
@@ -66,8 +66,10 @@ final class Workspace
     }
 
     /**
-     * The options last-word writes with: every picture by name, and limits
-     * that can hold every picture the saved file already has.
+     * The options last-word writes with: every picture by name, and the
+     * host's limits. `maxImages` is the host's configured cap, never the
+     * number of pictures the file happens to hold: a file is not allowed to
+     * raise its own limit.
      *
      * @return array{images: array<string, mixed>, imageLimits: array<string, int>}
      */
@@ -75,15 +77,21 @@ final class Workspace
     {
         return [
             'images' => $this->writerImages,
-            'imageLimits' => array_replace(['maxImages' => max(32, count($this->writerImages))], $this->options->imageLimits),
+            'imageLimits' => array_replace($this->options->imageLimits, ['maxImages' => $this->options->maxImages]),
         ];
     }
 
+    /** How many distinct pictures this edit holds: the working copy's own and the host's. */
+    public function pictureCount(): int
+    {
+        return count($this->writerImages);
+    }
+
     /**
-     * Refuses before any model call when the saved file's own pictures cannot
-     * be registered (a picture over last-word's size limit, say). Failing here
-     * costs nothing; failing on the first write costs a turn and tells the
-     * model about a problem it cannot fix.
+     * Refuses before any model call when the working copy's own pictures
+     * cannot be registered (a picture over last-word's size limit, say).
+     * Failing here costs nothing; failing on the first write costs a turn and
+     * tells the model about a problem it cannot fix.
      *
      * @throws ImageRefused
      */
@@ -95,8 +103,8 @@ final class Workspace
     /**
      * Write a draft, check it, and keep it if it passes.
      *
-     * Every top-level key and page key the draft leaves out is the saved
-     * file's: the body, the title, each band, each margin. So a request about
+     * Every top-level key and page key the draft leaves out is the working
+     * copy's: the body, the title, each band, each margin. So a request about
      * the header can send only `page.header`, and a whole rewrite that says
      * nothing of the header keeps it. `remove` names bands to drop on purpose.
      *
@@ -208,14 +216,14 @@ final class Workspace
      */
     public function compose(array $document, array $remove = []): array
     {
-        $saved = $this->source->named;
+        $base = $this->source->named;
         foreach (self::CARRIED as $key) {
-            if (! array_key_exists($key, $document) && array_key_exists($key, $saved)) {
-                $document[$key] = $saved[$key];
+            if (! array_key_exists($key, $document) && array_key_exists($key, $base)) {
+                $document[$key] = $base[$key];
             }
         }
 
-        $savedPage = is_array($saved['page'] ?? null) ? $saved['page'] : [];
+        $basePage = is_array($base['page'] ?? null) ? $base['page'] : [];
         $page = is_array($document['page'] ?? null) ? $document['page'] : [];
         $kept = [];
         foreach (DocumentTree::BANDS as $band) {
@@ -224,18 +232,18 @@ final class Workspace
 
                 continue;
             }
-            if (! array_key_exists($band, $page) && array_key_exists($band, $savedPage)) {
-                $page[$band] = $savedPage[$band];
+            if (! array_key_exists($band, $page) && array_key_exists($band, $basePage)) {
+                $page[$band] = $basePage[$band];
                 $kept[] = $band;
             }
         }
         foreach (self::CARRIED_PAGE as $key) {
-            if (! array_key_exists($key, $page) && array_key_exists($key, $savedPage)) {
-                $page[$key] = $savedPage[$key];
+            if (! array_key_exists($key, $page) && array_key_exists($key, $basePage)) {
+                $page[$key] = $basePage[$key];
             }
         }
         $margins = array_replace(
-            is_array($savedPage['margins'] ?? null) ? $savedPage['margins'] : [],
+            is_array($basePage['margins'] ?? null) ? $basePage['margins'] : [],
             is_array($page['margins'] ?? null) ? $page['margins'] : [],
         );
         if ($margins !== []) {

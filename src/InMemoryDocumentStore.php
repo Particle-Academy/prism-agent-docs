@@ -10,8 +10,6 @@ namespace Prism\AgentDocs;
  */
 final class InMemoryDocumentStore implements DocumentStore
 {
-    private int $draftReads = 0;
-
     public function __construct(private readonly ?string $saved = null, private ?string $draft = null) {}
 
     public function saved(): ?string
@@ -21,19 +19,11 @@ final class InMemoryDocumentStore implements DocumentStore
 
     public function draft(): ?string
     {
-        $this->draftReads++;
-
         return $this->draft;
     }
 
     public function putDraft(string $bytes): void
     {
         $this->draft = $bytes;
-    }
-
-    /** How many times something read the pending draft. The agent never should. */
-    public function draftReads(): int
-    {
-        return $this->draftReads;
     }
 }
