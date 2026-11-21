@@ -17,9 +17,9 @@
     ],
     "require": {
         "php": "^8.4",
-        "particle-academy/last-word": "^0.21.0",
-        "particle-academy/prism": "^0.150.0",
-        "particle-academy/prism-harness": "^0.26.3"
+        "particle-academy/last-word": ">=0.21 <1.0",
+        "particle-academy/prism": ">=0.150 <1.0",
+        "particle-academy/prism-harness": ">=0.26.3 <1.0"
     },
     "require-dev": {
         "laravel/pint": "^1.30",
