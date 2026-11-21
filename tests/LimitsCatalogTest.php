@@ -68,6 +68,7 @@ it('names, as data, the parts of a margin limit a .docx can still do, none of th
         foreach ($limit->expressible as $part) {
             expect($part->value)->toBe(0)
                 ->and($part->instruction)->toEndWith('.')
+                ->and($part->done)->toEndWith('.')->not->toContain('`')->not->toContain('page.margins')
                 ->and($part->askedBy)->not->toBe([])
                 ->and($part->sources)->not->toBe([])
                 ->and(array_intersect([$part->path], $limit->alternativePaths))->toBe([]);
@@ -81,7 +82,7 @@ it('refuses an expressible part that is an alternative path, so doing it could a
     file_put_contents($path, json_encode(['limits' => [
         ['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'alternativePaths' => ['page.margins.left'], 'applied' => 'Done.'],
         ['id' => 'z', 'statement' => 'Z.', 'appliesWhen' => 'z', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [
-            ['path' => 'page.margins.left', 'value' => 0, 'instruction' => 'Do it.', 'askedBy' => ['no left margin'], 'bands' => ['header'], 'sources' => [$source]],
+            ['path' => 'page.margins.left', 'value' => 0, 'done' => 'Done.', 'instruction' => 'Do it.', 'askedBy' => ['no left margin'], 'bands' => ['header'], 'sources' => [$source]],
         ]],
     ]]));
 
@@ -97,7 +98,7 @@ it('refuses an expressible part without a source or a known band', function (arr
     $source = ['package' => 'p', 'file' => 'f', 'section' => 's', 'quote' => 'q'];
     file_put_contents($path, json_encode(['limits' => [
         ['id' => 'x', 'statement' => 'X.', 'appliesWhen' => 'x', 'alternatives' => ['y'], 'sources' => [$source], 'expressible' => [array_replace(
-            ['path' => 'page.margins.header', 'value' => 0, 'instruction' => 'Do it.', 'askedBy' => ['no header margin'], 'bands' => ['header'], 'sources' => [$source]],
+            ['path' => 'page.margins.header', 'value' => 0, 'done' => 'Done.', 'instruction' => 'Do it.', 'askedBy' => ['no header margin'], 'bands' => ['header'], 'sources' => [$source]],
             $part,
         )]],
     ]]));
@@ -112,6 +113,8 @@ it('refuses an expressible part without a source or a known band', function (arr
     'unknown band' => [['bands' => ['sidebar']]],
     'no phrases' => [['askedBy' => []]],
     'not a number' => [['value' => 'zero']],
+    'no done sentence' => [['done' => null]],
+    'a done sentence that is not plain' => [['done' => 'Set `page.margins.header` to 0']],
 ]);
 
 it('refuses an alternative path that is not under page', function (): void {

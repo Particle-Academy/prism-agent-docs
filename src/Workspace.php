@@ -223,6 +223,13 @@ final class Workspace
             }
         }
 
+        foreach ($this->unshownParts($composed) as $part) {
+            if (! Paths::same($composed, $this->source->named, $part->path)) {
+                $composed = Paths::copy($composed, $this->source->named, $part->path);
+                $changed[] = sprintf('%s was set back to the document\'s own value: the document has no %s, so it would change nothing anyone sees.', $part->path, implode(' or ', $part->bands));
+            }
+        }
+
         $repaired = Agent::validateAndRepair($composed, $this->writerOptions());
         if (! $repaired['ok']) {
             $problems = [];
@@ -295,6 +302,55 @@ final class Workspace
         foreach ($this->limits as $reported) {
             foreach ($this->askedParts[$reported['limit']->id] ?? [] as $part) {
                 if ($part->applies($document)) {
+                    $parts[$part->path] ??= $part;
+                }
+            }
+        }
+
+        return array_values($parts);
+    }
+
+    /**
+     * The expressible parts of every reported limit that $document has no
+     * band for. Their paths are set back to the working copy's value, like an
+     * alternative's: a header distance in a document with no header changes
+     * nothing anyone can see, so a draft making only that change is the no-op
+     * draft scenario 3 forbids (G-316 live run 01a20049).
+     *
+     * @param  array<mixed>  $document
+     * @return list<Expressible>
+     */
+    public function unshownParts(array $document): array
+    {
+        $parts = [];
+        foreach ($this->limits as $reported) {
+            foreach ($reported['limit']->expressible as $part) {
+                if (! $part->applies($document)) {
+                    $parts[$part->path] ??= $part;
+                }
+            }
+        }
+
+        return array_values($parts);
+    }
+
+    /**
+     * The expressible parts of reported limits that the draft handed over
+     * makes: it has the band, holds the part's value, and the working copy
+     * did not. The person is told each in its `done` sentence.
+     *
+     * @return list<Expressible>
+     */
+    public function appliedParts(): array
+    {
+        if ($this->draft === null || $this->drafted === null) {
+            return [];
+        }
+        $drafted = $this->drafted;
+        $parts = [];
+        foreach ($this->limits as $reported) {
+            foreach ($reported['limit']->expressible as $part) {
+                if ($part->applies($drafted) && $part->heldBy($drafted) && ! Paths::same($drafted, $this->source->named, $part->path)) {
                     $parts[$part->path] ??= $part;
                 }
             }
@@ -387,12 +443,16 @@ final class Workspace
         // the alternative's change. Write it again under the new limit, so the
         // draft handed over never holds what the message only offers.
         if ($this->accepted !== null && $this->drafted !== null) {
-            foreach ($this->offeredPaths() as $path) {
+            // The same goes for a doable part the document has no band for:
+            // set back, so a header distance on a letterhead with no header
+            // is not handed over as the change.
+            $unshown = array_map(static fn (Expressible $part): string => $part->path, $this->unshownParts($this->drafted));
+            foreach ([...$this->offeredPaths(), ...$unshown] as $path) {
                 if (! Paths::same($this->drafted, $this->source->named, $path)) {
                     $again = $this->attempt(...$this->accepted);
                     $note = $again['ok']
-                        ? 'Recorded. Your draft made the alternative\'s change, which is offered to the person, not applied; it was taken out and the draft written again. End your turn with one short line.'
-                        : 'Recorded. Your draft made the alternative\'s change, which is offered to the person, not applied; without it the draft did not pass its checks, so there is no draft. End your turn with one short line.';
+                        ? 'Recorded. Your draft made a change that is only offered to the person, or that this document cannot show; it was taken out and the draft written again. End your turn with one short line.'
+                        : 'Recorded. Your draft made a change that is only offered to the person, or that this document cannot show; without it the draft did not pass its checks, so there is no draft. End your turn with one short line.';
 
                     break;
                 }

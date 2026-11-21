@@ -91,7 +91,7 @@ final readonly class LimitCatalog
                 $lines[] = sprintf('  Alternative %d%s: %s', $i, $i === 0 ? ' (closest)' : '', $alternative);
             }
             foreach ($limit->expressible as $part) {
-                $lines[] = sprintf('  Can still be done, when the request asks for it (for example "%s"): set `%s` to %s. %s', $part->askedBy[0], $part->path, (string) json_encode($part->value), $part->instruction);
+                $lines[] = sprintf('  Can still be done, when the request asks for it (for example "%s") and the document has a %s: set `%s` to %s. %s Without a %s it changes nothing anyone sees, so do not write it.', $part->askedBy[0], implode(' or ', $part->bands), $part->path, (string) json_encode($part->value), $part->instruction, $part->bands[0]);
             }
         }
 
@@ -188,12 +188,16 @@ final readonly class LimitCatalog
         if (! is_string($path) || preg_match('/^page(\.[A-Za-z]+)+$/', $path) !== 1 || ! (is_int($value) || is_float($value)) || ! is_string($instruction) || $instruction === '' || ! is_array($sources) || $sources === []) {
             throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has a malformed expressible part: it needs a dotted path under page, a number value, an instruction and at least one source.', $id));
         }
+        $done = $part['done'] ?? null;
+        if (! is_string($done) || ! str_ends_with($done, '.') || str_contains($done, '`')) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an expressible part for "%s" without a "done" sentence: one plain sentence, ending with a full stop, that tells the person what the draft did.', $id, $path));
+        }
         $askedBy = self::strings($part['askedBy'] ?? null, $id, 'expressible.askedBy');
         $bands = self::strings($part['bands'] ?? null, $id, 'expressible.bands');
         if ($askedBy === [] || $bands === [] || array_diff($bands, DocumentTree::BANDS) !== []) {
             throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has an expressible part for "%s" without askedBy phrases, or without bands from: %s.', $id, $path, implode(', ', DocumentTree::BANDS)));
         }
 
-        return new Expressible($path, $value, $instruction, $askedBy, $bands, self::sources($sources, $id));
+        return new Expressible($path, $value, $instruction, $askedBy, $bands, self::sources($sources, $id), $done);
     }
 }

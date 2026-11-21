@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Prism\AgentDocs;
 
 use Prism\AgentDocs\Check\Problem;
+use Prism\AgentDocs\Limits\Expressible;
 use Prism\AgentDocs\Limits\Limit;
 
 /**
@@ -79,7 +80,13 @@ final readonly class DocsResult
                 $notes[] = self::FIRST_PAGE_ONLY[count($first) > 1 ? 'both' : $first[0]];
             }
 
-            return new self(Outcome::Ready, implode(' ', [self::READY, ...$notes]), $version, $draft, $limits);
+            // A limit's doable part the draft made is said, in the
+            // catalogue's one sentence, before the offer: the owner's rule
+            // is "ready" plus what could not be done, and the message must
+            // still match the draft (G-316 live run 01a20049).
+            $done = array_map(static fn (Expressible $part): string => $part->done, $workspace->appliedParts());
+
+            return new self(Outcome::Ready, implode(' ', [self::READY, ...$done, ...$notes]), $version, $draft, $limits);
         }
         if ($limits !== []) {
             return new self(Outcome::Limit, implode(' ', $notes), $version, null, $limits);

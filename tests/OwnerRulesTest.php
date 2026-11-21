@@ -89,3 +89,54 @@ it('says nothing about pictures, headers or steps when a limit is reported', fun
     expect($result->message)->not->toContain('table')
         ->and($result->message)->not->toContain('I ');
 });
+
+/*
+| Owner rule 2 (lab R2): the message is "The draft is ready." plus only
+| sentences from the catalogue: a limit's statement and offer, and the `done`
+| sentence of a doable part the draft made. Every sentence it may say is
+| built from limits.json here; anything else, model prose included, fails.
+*/
+
+/** @return list<string> every message allowed for a ready draft with these limits */
+function allowedReadyMessages(array $ids): array
+{
+    $catalog = docsAgent()->catalog();
+    $out = [];
+    foreach ($ids as $id) {
+        $limit = $catalog->get($id);
+        $dones = [[]];
+        foreach ($limit->expressible as $part) {
+            foreach ($dones as $prefix) {
+                $dones[] = [...$prefix, $part->done];
+            }
+        }
+        foreach ($dones as $done) {
+            foreach ($limit->alternatives as $alternative) {
+                $out[] = implode(' ', [DocsResult::READY, ...$done, $limit->statement.DocsResult::OFFER.lcfirst($alternative)]);
+            }
+        }
+    }
+
+    return $out;
+}
+
+it('says only catalogue sentences when a request is partly doable', function (string $docx, string $request, array $turn): void {
+    $store = new InMemoryDocumentStore($docx);
+    ScriptedModel::install([$turn, 'I set the header margin to zero and kept your logo, and here is why the sides cannot change...']);
+
+    $result = editDocument($store, $request);
+
+    expect($result->outcome)->toBe(Outcome::Ready)
+        ->and(allowedReadyMessages(['side-margins-shared']))->toContain($result->message);
+})->with([
+    'R2: a heading change and a limit, no header' => [
+        Letterheads::bodyLetterhead(),
+        'Change the heading to "Proposal for Example Ltd" and give the header different side margins from the body.',
+        [ScriptedModel::call(DocsTools::REPORT_LIMIT, ['limit' => 'side-margins-shared', 'alternative' => 1]), ScriptedModel::call(DocsTools::WRITE_DRAFT, ['document' => ['title' => 'Proposal for Example Ltd']])],
+    ],
+    'S4: the header distance and a limit' => [
+        Letterheads::headerLetterhead(),
+        'Use no margins for the header.',
+        [ScriptedModel::call(DocsTools::REPORT_LIMIT, ['limit' => 'side-margins-shared']), ScriptedModel::call(DocsTools::WRITE_DRAFT, ['document' => ['page' => ['margins' => ['header' => 0]]]])],
+    ],
+]);

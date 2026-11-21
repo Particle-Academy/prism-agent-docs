@@ -312,6 +312,38 @@ $mutants = [
         'edits' => [['src/Support/Asked.php', '0(?!\w|\.\d)/u', '0(?!\w)/u']],
         'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
     ],
+    // G-316 live run 01a20049, scenario S3: a doable part only where it shows,
+    // and said when it is done.
+    'M38' => [
+        'seam' => 'a doable part with no band to position is set back (no no-op draft)',
+        'mutation' => 'keep the header distance in a document with no header',
+        'edits' => [['src/Workspace.php', 'foreach ($this->unshownParts($composed) as $part) {', 'foreach ([] as $part) {']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M39' => [
+        'seam' => 'a draft written before the limit is reported is set back too',
+        'mutation' => 're-run an earlier draft for the alternative\'s paths only',
+        'edits' => [['src/Workspace.php', 'foreach ([...$this->offeredPaths(), ...$unshown] as $path) {', 'foreach ($this->offeredPaths() as $path) {']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M40' => [
+        'seam' => 'the message says what the draft did (the catalogue\'s done sentence)',
+        'mutation' => 'say nothing of it',
+        'edits' => [['src/DocsResult.php', 'implode(\' \', [self::READY, ...$done, ...$notes])', 'implode(\' \', [self::READY, ...$notes])']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M41' => [
+        'seam' => 'the done sentence is said only for a change the draft made',
+        'mutation' => 'say it whenever the draft holds the value, even the working copy\'s own',
+        'edits' => [['src/Workspace.php', '$part->heldBy($drafted) && ! Paths::same($drafted, $this->source->named, $part->path)', '$part->heldBy($drafted)']],
+        'tests' => ['tests/Scenario4DoTheDoablePartTest.php'],
+    ],
+    'M42' => [
+        'seam' => 'every doable part has a plain done sentence',
+        'mutation' => 'drop the catalogue\'s check of it',
+        'edits' => [['src/Limits/LimitCatalog.php', 'if (! is_string($done) || ! str_ends_with($done, \'.\') || str_contains($done, \'`\')) {', 'if (! is_string($done)) {']],
+        'tests' => ['tests/LimitsCatalogTest.php'],
+    ],
 ];
 
 $only = array_slice($argv, 1);
