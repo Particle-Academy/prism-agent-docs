@@ -27,6 +27,7 @@
             "expressible": [
                 {
                     "path": "page.margins.header",
+                    "done": "The header now starts at the top edge of the page.",
                     "value": 0,
                     "instruction": "This is the header DISTANCE, how far the header sits from the top edge of the page, and a .docx holds it: write page.margins.header as 0 in the draft so the header starts at the top edge, keep every other margin as it is, and report the limit as well.",
                     "askedBy": [
@@ -69,6 +70,7 @@
                 },
                 {
                     "path": "page.margins.footer",
+                    "done": "The footer now ends at the bottom edge of the page.",
                     "value": 0,
                     "instruction": "This is the footer DISTANCE, how far the footer sits from the bottom edge of the page, and a .docx holds it: write page.margins.footer as 0 in the draft so the footer ends at the bottom edge, keep every other margin as it is, and report the limit as well.",
                     "askedBy": [
@@ -148,6 +150,7 @@
             "expressible": [
                 {
                     "path": "page.margins.header",
+                    "done": "The header now starts at the top edge of the page.",
                     "value": 0,
                     "instruction": "This is the header DISTANCE, how far the header sits from the top edge of the page, and a .docx holds it: write page.margins.header as 0 in the draft so the header starts at the top edge, keep every other margin as it is, and report the limit as well.",
                     "askedBy": [
@@ -190,6 +193,7 @@
                 },
                 {
                     "path": "page.margins.footer",
+                    "done": "The footer now ends at the bottom edge of the page.",
                     "value": 0,
                     "instruction": "This is the footer DISTANCE, how far the footer sits from the bottom edge of the page, and a .docx holds it: write page.margins.footer as 0 in the draft so the footer ends at the bottom edge, keep every other margin as it is, and report the limit as well.",
                     "askedBy": [

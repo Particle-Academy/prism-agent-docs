@@ -20,13 +20,21 @@ use Prism\AgentDocs\Support\Paths;
  *
  * `path` is never one of a limit's `alternativePaths`: the catalogue refuses
  * that, so doing the doable part can never apply an offered alternative.
+ *
+ * Where it does not show, it is not done: in a document with none of `bands`
+ * the path is set back to the working copy's value, like an alternative's
+ * (G-316 live run 01a20049, S3: a header distance of zero on a letterhead
+ * with no header, handed over as "the draft is ready"). Where it is done,
+ * the person is told so in `done`, between "The draft is ready." and the
+ * limit's offer, so the message still matches the draft.
  */
 final readonly class Expressible
 {
     /**
      * @param  list<string>  $askedBy  the phrases that ask for this part (see Support\Asked)
-     * @param  list<string>  $bands  the bands it positions; with none of them in the document it does nothing visible, so it is not required
+     * @param  list<string>  $bands  the bands it positions; with none of them in the document it does nothing visible, so it is neither required nor kept
      * @param  list<array{package: string, file: string, section: string, quote: string}>  $sources
+     * @param  string  $done  the one plain sentence the person is told when the draft makes this change
      */
     public function __construct(
         public string $path,
@@ -35,6 +43,7 @@ final readonly class Expressible
         public array $askedBy,
         public array $bands,
         public array $sources,
+        public string $done,
     ) {}
 
     /**

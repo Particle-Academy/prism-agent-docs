@@ -66,12 +66,17 @@ function lastUserMessage(ScriptedModel $model, int $request): string
     return $text;
 }
 
-/** The message the lab expects: {"ready": true, "limits": ["side-margins-shared"]}. */
+/**
+ * The message the lab expects, {"ready": true, "limits": ["side-margins-shared"]},
+ * with what the draft did said between the two: "The draft is ready. The header
+ * now starts at the top edge of the page. A Word page has one pair of side
+ * margins, ... The closest alternative, not applied unless you ask for it: ...".
+ */
 function readyWithSharedSideMargins(): string
 {
     $limit = docsAgent()->catalog()->get('side-margins-shared');
 
-    return DocsResult::READY.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]);
+    return DocsResult::READY.' '.$limit->expressible[0]->done.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]);
 }
 
 it('returns a run that reported the limit without drafting to the model, and hands back the doable part', function (): void {
@@ -206,6 +211,29 @@ it('pushes back a bounded number of times, then hands back the limit honestly', 
         ->and($result->message)->toBe($limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]));
 });
 
+it('says, in the catalogue\'s sentence, what the draft did, between "ready" and the offer', function (): void {
+    $store = new InMemoryDocumentStore(Letterheads::headerLetterhead());
+    ScriptedModel::install([[reportSharedSideMargins(), headerToZero()], 'Done.']);
+    $limit = docsAgent()->catalog()->get('side-margins-shared');
+
+    $result = editDocument($store, S4_ASK);
+
+    expect($result->message)->toBe('The draft is ready. The header now starts at the top edge of the page. '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]))
+        ->and($limit->expressible[0]->done)->toBe('The header now starts at the top edge of the page.');
+});
+
+it('does not say the header distance changed when the working copy already had it', function (): void {
+    $docx = Agent::toBytes(array_replace_recursive(Agent::read(Letterheads::headerLetterhead()), ['page' => ['margins' => ['header' => 0]]]));
+    $store = new InMemoryDocumentStore($docx);
+    ScriptedModel::install([[reportSharedSideMargins(), ScriptedModel::call(DocsTools::WRITE_DRAFT, ['document' => ['title' => 'Letterhead']])], 'Done.']);
+    $limit = docsAgent()->catalog()->get('side-margins-shared');
+
+    $result = editDocument($store, 'Use no margins for the header, and title it Letterhead.');
+
+    expect($result->outcome)->toBe(Outcome::Ready)
+        ->and($result->message)->toBe(DocsResult::READY.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]));
+});
+
 it('does the footer\'s doable part the same way', function (): void {
     $store = new InMemoryDocumentStore(Letterheads::headerLetterhead());
     $model = ScriptedModel::install([
@@ -219,6 +247,8 @@ it('does the footer\'s doable part the same way', function (): void {
 
     expect($result->outcome)->toBe(Outcome::Ready)
         ->and(marginsOf((string) $result->draft))->toBe(['footer' => 0])
+        ->and($result->message)->toContain('The footer now ends at the bottom edge of the page.')
+        ->not->toContain('The header now starts')
         ->and(lastUserMessage($model, 1))->toContain('page.margins.footer')
         ->not->toContain('page.margins.header');
 });
@@ -231,6 +261,49 @@ it('asks nothing of a document with no header: the header distance would change 
 
     expect($result->outcome)->toBe(Outcome::Limit)
         ->and($model->requests())->toHaveCount(1);
+});
+
+/*
+| G-316 live run 01a20049, scenario S3: on a letterhead with NO page header the
+| model set page.margins.header to 0, and the person was told "The draft is
+| ready." plus the offer. A header distance with no header changes nothing
+| anyone sees: it is set back, like an alternative, and the no-op draft that
+| leaves is refused, so the outcome is the limit again.
+*/
+
+it('sets back a header distance in a document with no header, so no no-op draft is handed over', function (array $script): void {
+    $store = new InMemoryDocumentStore(Letterheads::bodyLetterhead());
+    $model = ScriptedModel::install($script);
+    $limit = docsAgent()->catalog()->get('side-margins-shared');
+
+    $result = editDocument($store, S4_ASK);
+
+    expect($result->outcome)->toBe(Outcome::Limit)
+        ->and($result->draft)->toBeNull()
+        ->and($store->draft())->toBeNull()
+        ->and($result->message)->toBe($limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]))
+        ->and($model->requests())->toHaveCount(1);
+})->with([
+    'report, then the header distance' => [[[reportSharedSideMargins(), headerToZero()], 'Done.', 'Never reached.']],
+    'the header distance, then report' => [[[headerToZero(), reportSharedSideMargins()], 'Done.', 'Never reached.']],
+]);
+
+it('tells the model the header distance was set back, and keeps the rest of its draft', function (): void {
+    $store = new InMemoryDocumentStore(Letterheads::bodyLetterhead());
+    $model = ScriptedModel::install([[reportSharedSideMargins(), ScriptedModel::call(DocsTools::WRITE_DRAFT, ['document' => ['title' => 'Proposal', 'page' => ['margins' => ['header' => 0, 'footer' => 0]]]])], 'Done.']);
+    $limit = docsAgent()->catalog()->get('side-margins-shared');
+
+    $result = editDocument($store, 'Use no margins for the header, and title it Proposal.');
+
+    $write = $model->resultsOf(DocsTools::WRITE_DRAFT)[0];
+    expect($write['ok'])->toBeTrue()
+        ->and(implode(' ', $write['changed'] ?? []))->toContain('page.margins.header was set back')
+        ->toContain('page.margins.footer was set back')
+        ->and($result->outcome)->toBe(Outcome::Ready)
+        ->and(marginsOf((string) $result->draft))->toBe(marginsOf(Letterheads::bodyLetterhead()))
+        ->and(Agent::read((string) $result->draft)['title'] ?? null)->toBe('Proposal')
+        // Nothing was done to the header distance, so nothing is said of it.
+        ->and($result->message)->toBe(DocsResult::READY.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]));
 });
 
 it('asks for the doable part only when the request names it, narrowly', function (string $request, bool $header, bool $footer): void {

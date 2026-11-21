@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.4]
+
+A fix from the G-316 live lab run 01a20049 (scenario S3), which found a regression in 0.1.3.
+
+No breaking changes. Nothing in the public API is removed or renamed. A message for a partly doable request now carries one more sentence, and every catalogue `expressible` part needs a `done` sentence.
+
+### Fixed
+
+- **A doable part only where it shows.** On a body-designed letterhead with no page header, "Use no margins for the header" set `page.margins.header` to 0 and was handed over as "The draft is ready." plus the offer: a header distance with no header changes nothing anyone sees, so that was a no-op draft presented as the change. While a limit is reported, each of its doable parts is now set back to the working copy's value, like an alternative's paths, when the draft has no band it positions, and a draft written before the limit was reported is written again. With nothing else changed, the existing no-change rule refuses the draft, and the outcome is `limit` again.
+- **The message says what the draft did.** When a reported limit's doable part is in the draft, the message says so in one plain sentence from the catalogue, between "The draft is ready." and the offer: "The draft is ready. The header now starts at the top edge of the page. A Word page has one pair of side margins, ...". Only for a change the draft made; a working copy that already had it hears nothing of it.
+
+### Added
+
+- `done` on every `expressible` part in `resources/limits.json` (required: one plain sentence ending with a full stop), and `Expressible::$done`.
+- `Workspace::unshownParts()` and `Workspace::appliedParts()`.
+- The prompt says a doable part applies only when the document has the band.
+- Owner-rule test: a partly doable message is "The draft is ready." plus only catalogue sentences.
+- Mutants M38 to M42 in `tools/mutation-check.php`.
+
 ## [0.1.3]
 
 A fix from the G-316 live lab run 01a2002d (scenario S4, claude-sonnet-5-5).
