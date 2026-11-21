@@ -1,0 +1,62 @@
+{
+    "name": "particle-academy/prism-agent-docs",
+    "description": "A Word-document subagent for prism-harness: edits an existing .docx or creates one through Fancy's last-word writer, keeps every picture and the letterhead, knows the format's limits and checks its own output before handing back.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["ai", "agents", "docx", "word", "prism", "harness", "last-word"],
+    "homepage": "https://github.com/Particle-Academy/prism-agent-docs",
+    "support": {
+        "issues": "https://github.com/Particle-Academy/prism-agent-docs/issues",
+        "source": "https://github.com/Particle-Academy/prism-agent-docs"
+    },
+    "authors": [
+        {
+            "name": "Wish Born",
+            "email": "wish@impact.do"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "particle-academy/last-word": "^0.21.0",
+        "particle-academy/prism": "^0.150.0",
+        "particle-academy/prism-harness": "^0.26.3"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.30",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^4.0",
+        "phpstan/phpstan": "^2.0",
+        "rector/rector": "^2.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "Prism\\AgentDocs\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "@php vendor/bin/pest",
+        "types": "@php vendor/bin/phpstan analyse",
+        "format": "@php vendor/bin/pint",
+        "rector": "@php vendor/bin/rector process --dry-run"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Prism\\AgentDocs\\PrismAgentDocsServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
