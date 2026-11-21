@@ -8,8 +8,9 @@ declare(strict_types=1);
  * A test that passes is a claim; this makes it a check. Each mutant below is
  * the defect a seam exists to prevent (scenario 1's body-only picture list,
  * scenario 2's empty-draft-as-source, the host's working copy, scenario 3's
- * no-op draft, the owner's two rules, the host's bounds), applied to the real
- * source. The named tests must then FAIL. A
+ * no-op draft, the owner's two rules, the host's bounds, and from Moic's live
+ * test of 0.1.0: an alternative offered but applied, a first-page band nobody
+ * asked for), applied to the real source. The named tests must then FAIL. A
  * mutant the suite survives is a seam nothing guards, and this exits non-zero.
  *
  * Each search string must occur exactly once, so a refactor that moves the
@@ -24,6 +25,7 @@ declare(strict_types=1);
 
 $root = dirname(__DIR__);
 
+/** @var array<string, array{seam: string, mutation: string, edits: list<array{0: string, 1: string, 2: string}>, tests: list<string>}> $mutants */
 $mutants = [
     'M1' => [
         'seam' => 'picture registration covers every part (scenario 1)',
@@ -155,6 +157,92 @@ $mutants = [
         'mutation' => 'drop the cap',
         'edits' => [['src/DocsAgent.php', 'if (strlen($request) > $options->maxRequestBytes) {', 'if (false) {']],
         'tests' => ['tests/HostLimitsTest.php'],
+    ],
+    'M14' => [
+        'seam' => 'a reported limit\'s alternative is reverted before writing (offer, not apply)',
+        'mutation' => 'keep the model\'s change to the alternative\'s paths',
+        'edits' => [['src/Workspace.php',
+            '$composed = Paths::copy($composed, $this->source->named, $path);',
+            '']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M15' => [
+        'seam' => 'offer, not apply, holds even when BOTH guards are gone',
+        'mutation' => 'keep the change AND skip the self-check of the alternative\'s paths',
+        'edits' => [
+            ['src/Workspace.php', '$composed = Paths::copy($composed, $this->source->named, $path);', ''],
+            ['src/Check/SelfCheck.php', 'array_push($problems, ...self::offeredOnly($source, $produced, $unchangedPaths));', ''],
+        ],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M16' => [
+        'seam' => 'the self-check refuses a file that makes a reported limit\'s alternative',
+        'mutation' => 'skip that check',
+        'edits' => [['src/Check/SelfCheck.php', 'array_push($problems, ...self::offeredOnly($source, $produced, $unchangedPaths));', '']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M17' => [
+        'seam' => 'a draft written BEFORE the limit is reported is written again without the alternative',
+        'mutation' => 'keep the earlier draft as it was',
+        'edits' => [['src/Workspace.php', '$again = $this->attempt(...$this->accepted);', '$again = [\'ok\' => true];']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M18' => [
+        'seam' => 'the alternative is applied when the request asks for exactly that change',
+        'mutation' => 'never read the request as asking',
+        'edits' => [['src/Workspace.php', '$this->askedPaths = array_values(array_unique($asked));', '$this->askedPaths = [];']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M19' => [
+        'seam' => 'a negated phrase is not an explicit ask',
+        'mutation' => 'ignore negation',
+        'edits' => [['src/Support/Asked.php', 'if (! self::negated(substr($text, 0, $at))) {', 'if (true) {']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M20' => [
+        'seam' => 'the message offers an alternative the draft does not contain (owner rule)',
+        'mutation' => 'word every alternative as applied',
+        'edits' => [['src/DocsResult.php', 'static fn (array $reported): string => $workspace->alternativeApplied($reported[\'limit\'])', 'static fn (array $reported): string => true']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M21' => [
+        'seam' => 'an introduced first-page band becomes the band every page shows',
+        'mutation' => 'leave the model\'s firstHeader as it is',
+        'edits' => [['src/Workspace.php', 'if (! $this->askedFirstPageOnly && is_array($document[\'page\'] ?? null)) {', 'if (false) {']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M22' => [
+        'seam' => 'no unasked first-page band, even when BOTH guards are gone',
+        'mutation' => 'leave the firstHeader AND skip the self-check of first-page bands',
+        'edits' => [
+            ['src/Workspace.php', 'if (! $this->askedFirstPageOnly && is_array($document[\'page\'] ?? null)) {', 'if (false) {'],
+            ['src/Check/SelfCheck.php', 'array_push($problems, ...self::newFirstPageBands($source, $produced, $noNewBands));', ''],
+        ],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M23' => [
+        'seam' => 'the self-check refuses a first-page band the working copy lacked',
+        'mutation' => 'skip that check',
+        'edits' => [['src/Check/SelfCheck.php', 'array_push($problems, ...self::newFirstPageBands($source, $produced, $noNewBands));', '']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M24' => [
+        'seam' => 'a working copy\'s own first-page band is kept when the draft rewrites it',
+        'mutation' => 'normalise every first-page band the draft writes',
+        'edits' => [['src/Workspace.php', 'if (! array_key_exists($first, $page) || array_key_exists($first, $basePage)) {', 'if (! array_key_exists($first, $page)) {']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M25' => [
+        'seam' => 'a first-page band the request asks for is kept',
+        'mutation' => 'never read the request as asking for first-page-only',
+        'edits' => [['src/Workspace.php', '$this->askedFirstPageOnly = Asked::forAny($request, Asked::FIRST_PAGE_ONLY);', '$this->askedFirstPageOnly = false;']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
+    ],
+    'M26' => [
+        'seam' => 'the message says a first-page band shows on the first page only',
+        'mutation' => 'say nothing',
+        'edits' => [['src/DocsResult.php', '$notes[] = self::FIRST_PAGE_ONLY[count($first) > 1 ? \'both\' : $first[0]];', '']],
+        'tests' => ['tests/OfferNotApplyTest.php'],
     ],
 ];
 

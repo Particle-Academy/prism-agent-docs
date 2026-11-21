@@ -118,7 +118,7 @@ final class DocsAgent
             return DocsResult::failed(DocsResult::UNREADABLE, $version);
         }
 
-        $workspace = new Workspace($source, $this->catalog, $options);
+        $workspace = new Workspace($source, $this->catalog, $options, $request);
         if ($workspace->pictureCount() > $options->maxImages) {
             return DocsResult::failed(DocsResult::TOO_MANY_PICTURES, $version);
         }

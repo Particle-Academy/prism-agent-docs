@@ -10,6 +10,20 @@
                 "Set the side margins to zero for the whole page, so the header art runs edge to edge and the body text does too.",
                 "Keep the header art inside the page margins, as it is now."
             ],
+            "alternativePaths": ["page.margins.left", "page.margins.right"],
+            "askedBy": [
+                "side margins to zero for the whole page",
+                "side margins to zero for the whole document",
+                "side margins to zero on every page",
+                "zero side margins for the whole page",
+                "zero side margins for the whole document",
+                "no side margins for the whole page",
+                "no side margins for the whole document",
+                "no side margins on the whole page",
+                "left and right margins to zero for the whole page",
+                "left and right margins to zero for the whole document"
+            ],
+            "applied": "As you asked, the side margins are zero for the whole page, so the body text runs edge to edge as well as the header art.",
             "sources": [
                 {
                     "package": "particle-academy/last-word",
@@ -33,6 +47,17 @@
                 "Set the page margins to zero, so the picture can reach the edge of the page.",
                 "Keep the picture inside the margins at the full width of the text."
             ],
+            "alternativePaths": ["page.margins.top", "page.margins.right", "page.margins.bottom", "page.margins.left"],
+            "askedBy": [
+                "all margins to zero",
+                "all the margins to zero",
+                "all page margins to zero",
+                "all four margins to zero",
+                "page margins to zero",
+                "zero page margins",
+                "no page margins"
+            ],
+            "applied": "As you asked, the page margins are zero, so the body text reaches the edge of the page as well as the picture.",
             "council": "Fancy CC-fancy-0055 (pending): whether last-word should offer a bleed. Until it lands, the documented behaviour below is the limit.",
             "sources": [
                 {

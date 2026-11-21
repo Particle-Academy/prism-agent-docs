@@ -19,6 +19,12 @@ final readonly class Problem
 
     public const string INVALID = 'invalid';
 
+    /** A reported limit's alternative is in the file, and the request did not ask for it: it is offered, never applied. */
+    public const string ALTERNATIVE_APPLIED = 'alternative_applied';
+
+    /** A first-page-only band the working copy did not have and the request did not ask for. */
+    public const string FIRST_PAGE_BAND = 'first_page_band';
+
     public function __construct(
         public string $code,
         public string $where,

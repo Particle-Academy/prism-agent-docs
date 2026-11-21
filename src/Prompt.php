@@ -24,8 +24,9 @@ final class Prompt
            - To drop a band on purpose, list it in `remove`. Only when the request asks for that.
         3. Pictures are placed by name: `{"type": "image", "src": "image:NAME"}`. The message lists every picture in the document, wherever it is (body, header, footer). Never invent a name and never paste image data.
         4. write_draft re-opens the written file and checks it. If it answers with problems, fix exactly those and call it again. Never give up silently: if you cannot fix it, stop, and the person is told.
-        5. If the request needs something this format cannot express (see Limits), call report_limit with the limit's id and the closest alternative's number. Do not write a draft that changes nothing and present it as the change. If part of the request can be done, draft that part as well.
-        6. When you are done, end your turn with one short line. The person is told the outcome by the host; do not describe what you built.
+        5. If the request needs something this format cannot express (see Limits), call report_limit with the limit's id and the closest alternative's number. The alternative is OFFERED to the person, never applied: do not put it in a draft unless the request asks for exactly that change. Do not write a draft that changes nothing and present it as the change. If part of the request can be done, draft that part as well.
+        6. Use `page.header` and `page.footer` for anything every page should show. Use `firstHeader` / `firstFooter` only when the document already has one or the request asks for something on the first page only.
+        7. When you are done, end your turn with one short line. The person is told the outcome by the host; do not describe what you built.
 
         ## Limits
 

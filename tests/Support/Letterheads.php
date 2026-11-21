@@ -110,6 +110,26 @@ final class Letterheads
         ]);
     }
 
+    /**
+     * A letterhead that already uses Word's "different first page": the logo
+     * and divider in `firstHeader`, a plain running header on later pages.
+     */
+    public static function firstPageLetterhead(): string
+    {
+        return Agent::toBytes([
+            'blocks' => [
+                ['type' => 'paragraph', 'runs' => [['text' => 'Dear Ms Example,']]],
+            ],
+            'page' => [
+                'firstHeader' => ['blocks' => [
+                    ['type' => 'image', 'src' => self::dataUrl(self::logo()), 'widthPx' => 96, 'heightPx' => 48],
+                    ['type' => 'image', 'src' => self::dataUrl(self::divider())],
+                ]],
+                'header' => ['right' => 'Example Ltd'],
+            ],
+        ]);
+    }
+
     public static function emptyDraft(): string
     {
         return Agent::toBytes(['blocks' => []]);

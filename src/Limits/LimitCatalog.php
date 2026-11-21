@@ -83,6 +83,17 @@ final readonly class LimitCatalog
         return implode("\n", $lines);
     }
 
+    /** @return list<string> */
+    private static function strings(mixed $value, string $id, string $key): array
+    {
+        if (! is_array($value) || array_filter($value, static fn (mixed $item): bool => ! is_string($item) || $item === '') !== []) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has a "%s" that is not a list of strings.', $id, $key));
+        }
+
+        /** @var list<string> */
+        return array_values($value);
+    }
+
     private static function entry(mixed $entry): Limit
     {
         if (! is_array($entry)) {
@@ -107,6 +118,18 @@ final readonly class LimitCatalog
 
         $council = $entry['council'] ?? null;
 
+        $paths = self::strings($entry['alternativePaths'] ?? [], $id, 'alternativePaths');
+        $askedBy = self::strings($entry['askedBy'] ?? [], $id, 'askedBy');
+        $applied = $entry['applied'] ?? null;
+        foreach ($paths as $path) {
+            if (preg_match('/^page(\.[A-Za-z]+)+$/', $path) !== 1) {
+                throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" names the path "%s"; an alternative path is a dotted path under page, such as page.margins.left.', $id, $path));
+            }
+        }
+        if ($paths !== [] && ! is_string($applied)) {
+            throw new RuntimeException(sprintf('[prism-agent-docs] The limit "%s" has alternativePaths but no "applied" wording for when the request asks for that change.', $id));
+        }
+
         return new Limit(
             $id,
             $statement,
@@ -114,6 +137,9 @@ final readonly class LimitCatalog
             array_values(array_filter($alternatives, is_string(...))),
             $cited,
             is_string($council) ? $council : null,
+            $paths,
+            $askedBy,
+            is_string($applied) ? $applied : null,
         );
     }
 }
