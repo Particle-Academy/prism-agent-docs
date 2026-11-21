@@ -25,6 +25,7 @@
                 "left and right margins to zero for the whole document"
             ],
             "applied": "As you asked, the side margins are zero for the whole page, so the body text runs edge to edge as well as the header art.",
+            "alternativeChanges": [{"page.margins.left": 0, "page.margins.right": 0}, {}],
             "expressible": [
                 {
                     "path": "page.margins.header",
@@ -155,6 +156,7 @@
                 "no page margins"
             ],
             "applied": "As you asked, the page margins are zero, so the body text reaches the edge of the page as well as the picture.",
+            "alternativeChanges": [{"page.margins.top": 0, "page.margins.right": 0, "page.margins.bottom": 0, "page.margins.left": 0}, null],
             "council": "Fancy CC-fancy-0055 (anchored and floating pictures, bleed included), first in Fancy's gap order, closes this. Until it lands, the writer caps every picture at the text column.",
             "expressible": [
                 {

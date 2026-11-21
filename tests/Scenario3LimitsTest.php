@@ -107,7 +107,8 @@ it('says the draft is ready and names the limit when part of a request can be do
     $limit = docsAgent()->catalog()->get('side-margins-shared');
 
     expect($result->outcome)->toBe(Outcome::Ready)
-        ->and($result->message)->toBe(DocsResult::READY.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[1]));
+        // The model chose alternative 1, "as it is now": never offered (G-316 live run 01a2007d).
+        ->and($result->message)->toBe(DocsResult::READY.' '.$limit->statement.DocsResult::OFFER.lcfirst($limit->alternatives[0]));
 });
 
 it('gives the model every catalogued limit, with its alternatives', function (): void {
